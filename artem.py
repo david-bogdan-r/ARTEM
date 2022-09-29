@@ -35,7 +35,7 @@ saveformat = 'PDB'
 
 threads = 1
 
-repr_struct_comp = (
+repr_struct_res = (
     nar.five_atom_repr,     # for primary alignment
     nar.five_atom_repr,     # to calculate centers of mass
     nar.three_atom_repr,    # for secondary alignment
@@ -113,26 +113,26 @@ if  __name__ == '__main__':
     rsstruct.drop_duplicates_alt_id(keep='last')
     qsstruct.drop_duplicates_alt_id(keep='last')
     
-    # pre proc repr_struct_comp
+    # pre proc repr_struct_res
     prep = []
     repr_struct = {}
-    for repr_comp in repr_struct_comp:
-        if repr_comp in prep:
-            for k in repr_comp:
+    for repr_res in repr_struct_res:
+        if repr_res in prep:
+            for k in repr_res:
                 if k in repr_struct:
-                    repr_struct[k].append(repr_comp[k])
+                    repr_struct[k].append(repr_res[k])
                 else:
-                    repr_struct[k] = [repr_comp[k]]
+                    repr_struct[k] = [repr_res[k]]
         else:
-            for k in repr_comp.keys():
-                repr_comp[k] = [pd.Index(v.split()) for v in repr_comp[k]]
+            for k in repr_res.keys():
+                repr_res[k] = [pd.Index(v.split()) for v in repr_res[k]]
                 
                 if k in repr_struct:
-                    repr_struct[k].append(repr_comp[k])
+                    repr_struct[k].append(repr_res[k])
                 else:
-                    repr_struct[k] = [repr_comp[k]]
+                    repr_struct[k] = [repr_res[k]]
             
-            prep.append(repr_comp)
+            prep.append(repr_res)
     #
     
     rdata = rsstruct.artem_desc(repr_struct)
