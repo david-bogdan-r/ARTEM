@@ -77,10 +77,10 @@ class Structure:
         val = data[':']
         if val:
             vals    = val.split('_')
-            comp_id = ''
+            res_id = ''
             
             if len(vals) == 2:
-                comp_id, seq_id = vals
+                res_id, seq_id = vals
                 
                 if seq_id.isdigit():
                     seq_id  = int(seq_id)
@@ -96,7 +96,7 @@ class Structure:
                     cur_tab  = cur_tab[cur_tab['auth_comp_id'].eq(seq_id_s)]
             
             elif len(vals) == 3:
-                comp_id, seq_id_1, seq_id_2 = vals
+                res_id, seq_id_1, seq_id_2 = vals
                 
                 seq_id_1 = int(seq_id_1)
                 seq_id_2 = int(seq_id_2)
@@ -104,8 +104,8 @@ class Structure:
                     cur_tab['auth_seq_id'].between(seq_id_1, seq_id_2)
                 ]
             
-            if comp_id:
-                cur_tab = cur_tab[cur_tab['auth_comp_id'].eq(comp_id)]
+            if res_id:
+                cur_tab = cur_tab[cur_tab['auth_comp_id'].eq(res_id)]
         
         struct = Structure(self.name)
         struct.set_tab(cur_tab)
@@ -137,19 +137,19 @@ class Structure:
                 + '.' + tab['auth_seq_id'].astype(str)\
                 + '.' + tab['pdbx_PDB_ins_code'].astype(str).replace('?', '')
         
-        comp   = []
-        # comp_b = []
+        res   = []
+        # res_b = []
         for code, t in tab[['Cartn_x', 'Cartn_y', 'Cartn_z']].groupby(mask):
             flg = False
             c   = []
-            comp_id = code.split('.', 3)[-2]
+            res_id = code.split('.', 3)[-2]
             
-            if comp_id not in desc:
-                # comp_b.append(code)
+            if res_id not in desc:
+                # res_b.append(code)
                 continue
             
-            comp_desc = desc[comp_id]
-            for d in comp_desc:
+            res_desc = desc[res_id]
+            for d in res_desc:
                 m = []
                 for dd in d:
                     v = t.loc[t.index.intersection(dd)].values
@@ -169,15 +169,15 @@ class Structure:
                 c.append(m)
             
             if flg:
-                # comp_b.append(code)
+                # res_b.append(code)
                 continue
             
             c[1] = c[1].mean(axis=0)
-            comp.append([code, *c])
+            res.append([code, *c])
         
-        comp    = list(zip(*comp))
-        comp[2] = np.vstack(comp[2])
-        return comp #, comp_b
+        res    = list(zip(*res))
+        res[2] = np.vstack(res[2])
+        return res #, res_b
 
 
 class Parser:
@@ -294,16 +294,3 @@ class Parser:
 # tab['label_alt_id'].fillna('.', inplace=True)
 # tab['pdbx_PDB_ins_code'].fillna('?', inplace=True)
 # tab['pdbx_formal_charge'].fillna('?', inplace=True)
-
-# tab.drop_duplicates(
-        #     [
-        #         'pdbx_PDB_model_num', 
-        #         'auth_asym_id', 
-        #         'auth_comp_id',
-        #         'auth_seq_id',
-        #         'pdbx_PDB_ins_code',
-        #         'auth_atom_id'
-        #     ],
-        #     keep = 'last',
-        #     inplace = True
-        # )
