@@ -68,26 +68,6 @@ def apply_transform(coord:np.ndarray, rotran):
     return np.dot(coord, rot) + tran
 
 
-# def distances_via_KDtree(s_tree):
-    
-
-# def distances_via_KDtree(rmat:np.ndarray, *qmat:np.ndarray) -> list:
-#     global matchrange
-    
-#     rtree = KDTree(rmat)
-#     distances = [
-#         rtree.sparse_distance_matrix(
-#             qtree, 
-#             matchrange, 
-#             p=2,
-#             output_type='ndarray'
-#         )
-#         for qtree in map(KDTree, qmat)
-#     ]
-    
-#     return distances
-
-
 def mutual_nb(dist) -> list:
     U_1 = {}
     U_2 = {}
