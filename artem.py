@@ -232,7 +232,7 @@ if  __name__ == '__main__':
         q_scode = [q_code[k] for k in q_ind]
         
         print('{}\t{}={}\t{}\t{:0.3f}\t{:0.3f}'.format(c, *seed_pair, s, r, rs))
-        print('\t'.join(['{}={}'.format(rc, qc) for rc, qc in zip(r_scode, q_scode)]))
+        print(','.join(['{}={}'.format(rc, qc) for rc, qc in zip(r_scode, q_scode)]))
         
         c += 1
     
