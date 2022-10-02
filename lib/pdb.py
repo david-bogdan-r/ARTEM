@@ -65,7 +65,7 @@ class Structure:
                 tt['id'] = range(1, len(tt) + 1)
                 tt['id'] = tt['id'] % 1_000_000
                 chain_count = 0
-                for asym_id, ttt in tt.groupby('auth_asym_id'):
+                for asym_id, ttt in tt.groupby('auth_asym_id', sort=False):
                     ttt['id'] += chain_count
                     for i in range(len(ttt)):
                         text += ATOM_FORMAT.format(**ttt.iloc[i])
