@@ -16,7 +16,7 @@ class Structure:
             name = 'struct_{}'.format(Structure.count)
         
         self.name = name
-        self.tab  = None # pd.DataFrame
+        self.tab  = None # pandas.DataFrame
         self.fmt  = None # str
     
     
@@ -45,9 +45,11 @@ class Structure:
     
     def saveto(self, folder:str, fmt:str = None) -> None:
         os.makedirs(folder, exist_ok=True)
-        if fmt is None:
-            fmt = self.fmt
         tab  = self.tab
+        
+        if not fmt:
+            fmt = self.fmt
+        
         path = '{folder}/{name}.{ext}'.format(
             folder = folder,
             name   = self.name,
@@ -56,32 +58,41 @@ class Structure:
         file = open(path, 'w')
         
         if fmt == 'PDB':
-            tab = tab.replace('.', '')
-            tab = tab.replace('?', '')
+            if self.fmt != fmt:
+                tab = tab.replace('.', '')
+                tab.replace('?', '', inplace=True)
             
             text = ''
             for model_num, tt in tab.groupby('pdbx_PDB_model_num', sort=False):
                 text += MODEL_FORMAT.format(model_num)
                 tt['id'] = range(1, len(tt) + 1)
-                tt['id'] = tt['id'] % 1_000_000
                 chain_count = 0
                 for asym_id, ttt in tt.groupby('auth_asym_id', sort=False):
-                    ttt['id'] += chain_count
-                    for i in range(len(ttt)):
-                        text += ATOM_FORMAT.format(**ttt.iloc[i])
-                    d = ttt.iloc[i].to_dict()
-                    d['id'] += 1
-                    text  += TER_FORMAT.format(**d)
+                    ttt['id'] = (ttt['id'] + chain_count) % 1_000_000
+                    for item in ttt.iloc:
+                        text += ATOM_FORMAT.format(**item)
+                    item['id'] += 1
+                    text  += TER_FORMAT.format(**item)
                     chain_count += 1
                 text += ENDMDL
             file.write(text)
         
         elif fmt == 'CIF':
-            tab['label_asym_id']   = tab['auth_asym_id']
-            tab['label_atom_id']   = tab['auth_atom_id']
-            tab['label_comp_id']   = tab['auth_comp_id']
-            tab['label_seq_id']    = tab['auth_seq_id']
-            tab['label_entity_id'] = tab['pdbx_PDB_model_num']
+            if self.fmt != fmt:
+                tab = tab.copy()
+                tab['pdbx_PDB_ins_code'].replace('', '?', inplace=True)
+                tab['pdbx_formal_charge'].replace('', '?', inplace=True)
+                tab['label_alt_id'].replace('', '.', inplace=True)
+                
+                tab['label_atom_id']   = tab['auth_atom_id']
+                tab['label_comp_id']   = tab['auth_comp_id']
+                tab['label_asym_id']   = tab['auth_asym_id']
+                tab['label_seq_id']    = tab['auth_seq_id']
+                
+                entity = tab['label_asym_id'].unique()
+                entity = dict(zip(entity, range(1, len(entity) + 1)))
+                tab['label_entity_id'] = tab['label_asym_id'].replace(entity)
+            
             
             title = 'data_{}\n'.format(self.name.upper())
             file.write(title)
@@ -201,34 +212,33 @@ class Structure:
         )
     
     
-    def artem_desc(self, desc:dict) -> list:
+    def artem_desc(self, res_repr:dict[str:list]):
         tab  = self.tab.set_index('auth_atom_id')
         mask = tab['pdbx_PDB_model_num'].astype(str)\
-                + '.' + tab['auth_asym_id'].astype(str)\
-                + '.' + tab['auth_comp_id'].astype(str)\
-                + '.' + tab['auth_seq_id'].astype(str)\
-                + '.' + tab['pdbx_PDB_ins_code'].astype(str).replace('?', '')
+               + '.' + tab['auth_asym_id'].astype(str)\
+               + '.' + tab['auth_comp_id'].astype(str)\
+               + '.' + tab['auth_seq_id'].astype(str)\
+               + '.' + tab['pdbx_PDB_ins_code'].astype(str).replace('?', '')
         
-        res = []
-        msg = []
+        rres = []
+        ures = []
         for code, t in tab[['Cartn_x', 'Cartn_y', 'Cartn_z']].groupby(mask, sort=False):
-            flg = False
-            c   = []
             res_id = code.split('.', 3)[-2]
-            
-            if res_id not in desc:
-                msg.append('{} unrepresentative'.format(code))
+            if res_id not in res_repr.keys():
+                ures.append(code)
                 continue
             
-            res_desc = desc[res_id]
-            for d in res_desc:
+            flg = False
+            c   = []
+            
+            for r in res_repr[res_id]:
                 m = []
-                for dd in d:
+                for rr in r:
                     try:
-                        v = t.loc[dd].values
+                        v = t.loc[rr].values
                     except:
+                        ures.append(code)
                         flg = True
-                        msg.append('{} unrepresentative'.format(code))
                         break
                     
                     if len(v) > 1:
@@ -246,14 +256,9 @@ class Structure:
                 continue
             
             c[1] = c[1].mean(axis=0)
-            res.append([code, *c])
+            rres.append([code, *c])
         
-        res    = list(zip(*res))
-        res[2] = np.vstack(res[2])
-        
-        # for m in msg:
-        #     print(m)
-        return res
+        return rres, ures
 
 
 
@@ -316,9 +321,7 @@ def parser(path:str, fmt:str = 'PDB', name:str = '') -> Structure:
         
         tab = pd.DataFrame(items, columns=columns)
         tab = tab.apply(pd.to_numeric)
-        tab['pdbx_PDB_ins_code'].fillna('?', inplace=True)
-        tab['pdbx_formal_charge'].fillna('?', inplace=True)
-        tab['label_alt_id'].fillna('.', inplace=True)
+        tab.fillna('', inplace=True)
     
     elif fmt == 'CIF':
         file = open(path, 'r')
@@ -327,7 +330,7 @@ def parser(path:str, fmt:str = 'PDB', name:str = '') -> Structure:
         
         start = text.find('_atom_site.')
         end   = text.find('#', start) - 1
-        tab   = text[start: end].split('\n')
+        tab   = text[start:end].split('\n')
         
         columns = []
         for i, line in enumerate(tab):
@@ -358,10 +361,8 @@ def parser(path:str, fmt:str = 'PDB', name:str = '') -> Structure:
                 tab[a] = tab[l]
         
         l = lambda x: x[1:-1] if x.startswith('"') or x.startswith("'") else x
-        
         tab['label_atom_id'] = list(map(l, tab['label_atom_id']))
-        if 'auth_atom_id' in tab.columns:
-            tab['auth_atom_id'] = list(map(l, tab['auth_atom_id']))
+        tab['auth_atom_id']  = list(map(l, tab['auth_atom_id']))
     
     struct = Structure(name)
     struct.set_tab(tab)

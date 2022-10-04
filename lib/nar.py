@@ -72,3 +72,14 @@ three_atom_repr = {
     '3TD': ('C5', 'C4', 'C2'),
     'UY1': ('C5', 'C4', 'C2'),
 }
+
+
+if __name__.endswith('nar'):
+    from pandas import Index
+
+    loc = locals().copy()
+    for k, v in loc.items():
+        if not k.startswith('_') and type(v) == dict:
+            for kk in v:
+                v[kk] = [Index(vv.split()) for vv in v[kk]]
+            locals()[k] = v

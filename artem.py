@@ -6,9 +6,13 @@ import pandas as pd
 import numpy  as np
 import multiprocessing as mp
 
+from scipy.spatial import KDTree
 from lib import nar
 from lib import pdb
-from scipy.spatial import KDTree
+
+# ignore SettingWithCopyWarning
+pd.set_option('mode.chained_assignment', None)
+
 
 rres    = ''
 qres    = ''
@@ -29,15 +33,23 @@ saveformat = 'PDB'
 
 threads = 1
 
-repr_struct_res = (
-    nar.five_atom_repr,     # for primary alignment
-    nar.five_atom_repr,     # to calculate centers of mass
-    nar.three_atom_repr,    # for secondary alignment
-    nar.three_atom_repr     # to calculate the RMSD
+seed_res_repr = (
+    # For primary alignment
+    nar.five_atom_repr,
+    
+    # To calculate centers of mass
+    nar.five_atom_repr,
+    
+    # For secondary alignment
+    nar.three_atom_repr,
+    
+    # To calculate the RMSD
+    nar.three_atom_repr,
 )
 
+# Keep alternative atom locations: 'first', 'last', False
+keep = 'last'
 
-# func
 
 def get_transform(r:np.ndarray, q:np.ndarray):
     r_avg = r.mean(axis=0)
@@ -69,6 +81,9 @@ def apply_transform(coord:np.ndarray, rotran):
 
 
 def mutual_nb(dist) -> list:
+    '''
+    dist: list of [rresId1, qresId2, distance]
+    '''
     U_1 = {}
     U_2 = {}
     
@@ -100,8 +115,60 @@ def vstack(alt):
     return np.vstack(ref_coord), np.vstack(alg_coord)
 
 
+def task(m, n):
+    transform  = get_transform(r_prim[m], q_prim[n])
+    
+    q_avg_tree = KDTree(apply_transform(q_avg, transform))
+    dist = r_avg_tree.sparse_distance_matrix(
+        q_avg_tree,
+        matchrange,
+        p=2,
+        output_type='ndarray'
+    )
+    
+    nb   = mutual_nb(dist)
+    size = len(nb)
+    if not sizemin <= size <= sizemax:
+        return None
+    
+    scnd = vstack([[r_scnd[i], q_scnd[j]] for i, j in nb])
+    transform  = get_transform(*scnd)
+    
+    r_coord, q_coord = vstack([[r_eval[i], q_eval[j]] for i, j in nb])
+    q_coord = apply_transform(q_coord, transform)
+    
+    rmsd = RMSD(r_coord, q_coord)
+    if not rmsdmin <= rmsd <= rmsdmax:
+        return None
+    
+    rmsdsize = rmsd / size
+    if not rmsdsizemin <= rmsdsize <= rmsdsizemax:
+        return None
+    
+    nb.sort()
+    return [size, rmsd, rmsdsize, tuple(nb), transform]
+
+
+def saver(item:pd.Series) -> None:
+    struct = sstruct.apply_transform(item['TRAN'])
+    struct.rename('{}_{}'.format(struct, item.name))
+    struct.saveto(saveto, saveformat)
+
+
+
 if  __name__ == '__main__':
     kwargs = dict([arg.split('=') for arg in sys.argv[1:]])
+    
+    threads = int(kwargs.get('threads', threads))
+    if threads != 1:
+        try:
+            mp.set_start_method('fork')
+        except:
+            print(
+                'Multiprocessing is available only for UNIX systems', 
+                file=sys.stderr
+            )
+            threads = 1
     
     r       = kwargs.get('r')
     q       = kwargs.get('q')
@@ -110,18 +177,16 @@ if  __name__ == '__main__':
     rformat = kwargs.get('rformat', rformat)
     qformat = kwargs.get('qformat', qformat)
     
-    rmsdmin     = float(kwargs.get('rmsdmin', rmsdmin))
-    rmsdmax     = float(kwargs.get('rmsdmax', rmsdmax))
     sizemin     = float(kwargs.get('sizemin', sizemin))
     sizemax     = float(kwargs.get('sizemax', sizemax))
+    rmsdmin     = float(kwargs.get('rmsdmin', rmsdmin))
+    rmsdmax     = float(kwargs.get('rmsdmax', rmsdmax))
     rmsdsizemin = float(kwargs.get('rmsdsizemin', rmsdsizemin))
     rmsdsizemax = float(kwargs.get('rmsdsizemax', rmsdsizemax))
     matchrange  = float(kwargs.get('matchrange', matchrange))
     
     saveto     = kwargs.get('saveto', saveto)
     saveres    = kwargs.get('saveres', saveres)
-    
-    threads = int(kwargs.get('threads', threads))
     
     rname, rext = r.split(os.sep)[-1].split('.')
     qname, qext = q.split(os.sep)[-1].split('.')
@@ -140,112 +205,114 @@ if  __name__ == '__main__':
     rstruct = pdb.parser(r, rformat, rname)
     qstruct = pdb.parser(q, qformat, qname)
     
+    rstruct.drop_duplicates_alt_id(keep=keep)
+    qstruct.drop_duplicates_alt_id(keep=keep)
+    
     rsstruct = rstruct.get_sub_struct(rres)
     qsstruct = qstruct.get_sub_struct(qres)
-    
-    rsstruct.drop_duplicates_alt_id(keep='last')
-    qsstruct.drop_duplicates_alt_id(keep='last')
-    
-    # pre proc repr_struct_res
-    prep = []
-    repr_struct = {}
-    for repr_res in repr_struct_res:
-        if repr_res in prep:
-            for k in repr_res:
-                if k in repr_struct:
-                    repr_struct[k].append(repr_res[k])
-                else:
-                    repr_struct[k] = [repr_res[k]]
-        else:
-            for k in repr_res.keys():
-                repr_res[k] = [pd.Index(v.split()) for v in repr_res[k]]
-                
-                if k in repr_struct:
-                    repr_struct[k].append(repr_res[k])
-                else:
-                    repr_struct[k] = [repr_res[k]]
-            
-            prep.append(repr_res)
-    #
-    
-    r_code, r_prim, r_avg, r_scnd, r_rmsd = rsstruct.artem_desc(repr_struct)
-    q_code, q_prim, q_avg, q_scnd, q_rmsd = qsstruct.artem_desc(repr_struct)
-    
-    code_queue = list(itertools.product(r_code, q_code))
-    
-    # Primary alignment
-    r_coord, q_coord = zip(*itertools.product(r_prim, q_prim))
-    transform = map(get_transform, r_coord, q_coord)
-    
-    # Calculation of mutual neighbour's
-    q_avg = map(apply_transform, itertools.repeat(q_avg), transform)
-    
-    r_tree = KDTree(r_avg)
-    q_tree = map(KDTree, q_avg)
-    dist   = map(
-        lambda x:
-            r_tree.sparse_distance_matrix(
-                x,
-                matchrange,
-                p=2,
-                output_type='ndarray'
-            ),
-        q_tree
-    )
-    nb = list(map(mutual_nb, dist))
-    
-    # Secondary alignment
-    nb_scnd = [[(r_scnd[i], q_scnd[j]) for i, j in m] 
-                for m in nb]
-    r_coord, q_coord = zip(*map(vstack, nb_scnd))
-    transform = list(map(get_transform, r_coord, q_coord))
-    
-    # RMSD calculate
-    nb_rmsd = [[(r_rmsd[i], q_rmsd[j]) for i, j in m] 
-                for m in nb]
-    r_coord, q_coord = zip(*map(vstack, nb_rmsd))
-    q_coord = map(apply_transform, q_coord, transform)
-    rmsd    = map(RMSD, r_coord, q_coord)
-
-    
-    ans   = []
-    count = itertools.count()
-    size  = map(len, nb)
-    for c, s, r in zip(count, size, rmsd):
-        if not sizemin <= s <= sizemax:
-            continue
-        if not rmsdmin <= r <= rmsdmax:
-            continue
-        if not rmsdsizemin <= r / s <= rmsdsizemax:
-            continue
-        
-        ans.append((c, s, r, r / s))
-    ans.sort(key=lambda x: x[3])
-    
-    c = 1
-    for i, s, r, rs in ans:
-        seed_pair = code_queue[i]
-        alt = sorted(nb[i], key=lambda u: u[0])
-        r_ind, q_ind = zip(*alt)
-        
-        r_scode = [r_code[k] for k in r_ind]
-        q_scode = [q_code[k] for k in q_ind]
-        
-        print('{}\t{}={}\t{}\t{:0.3f}\t{:0.3f}'.format(c, *seed_pair, s, r, rs))
-        print(','.join(['{}={}'.format(rc, qc) for rc, qc in zip(r_scode, q_scode)]))
-        
-        c += 1
     
     if saveto:
         if saveres:
             sstruct = qstruct.get_sub_struct(saveres)
         else:
             sstruct = qsstruct
-        
-        c = 1
-        for i in [a[0] for a in ans]:
-            struct = sstruct.apply_transform(transform[i])
-            struct.rename('{}_{}'.format(struct, c))
-            struct.saveto(saveto, saveformat)
-            
-            c += 1
+    
+    carrier = set.intersection(
+        *map(
+            lambda x: set(x.keys()),
+            seed_res_repr
+        )
+    )
+    res_repr = {}
+    for res in carrier:
+        res_repr[res] = [rr[res] for rr in  seed_res_repr]
+    
+    rrres, rures = rsstruct.artem_desc(res_repr)
+    qrres, qures = qsstruct.artem_desc(res_repr)
+    
+    if not rrres or not qrres:
+        columns = ['SIZE', 'RMSD', 'RMSDSIZE', 'PRIM', 'SCND', 'TRAN']
+        tab     = []
+        for code in rures:
+            tab.append([0, None, None, rsstruct.name, code, None])
+        for code in qures:
+            tab.append([0, None, None, qsstruct.name, code, None])
+        tab = pd.DataFrame(tab, columns=columns)
+        tab.index = range(1, len(tab) + 1)
+        tab.index.name = 'ID'
+        tab.to_csv(
+            sys.stdout,
+            columns=['SIZE', 'RMSD', 'RMSDSIZE', 'PRIM', 'SCND'],
+            sep='\t',
+            float_format='{:0.3f}'.format
+        )
+        exit()
+    
+    r_code, r_prim, r_avg, r_scnd, r_eval = zip(*rrres)
+    q_code, q_prim, q_avg, q_scnd, q_eval = zip(*qrres)
+    
+    r_avg = np.vstack(r_avg)
+    q_avg = np.vstack(q_avg)
+    
+    cpairs = list(itertools.product(r_code, q_code))
+    ipairs = itertools.product(range(len(r_code)), range(len(q_code)))
+    
+    r_avg_tree = KDTree(r_avg)
+    if threads == 1:
+        result = [task(m, n) for m, n in ipairs]
+    else:
+        if threads == -1:
+            pool = mp.Pool(mp.cpu_count())
+        else:
+            pool = mp.Pool(min(threads, mp.cpu_count()))
+        result = pool.starmap(task, ipairs)
+    
+    items = {}
+    for i, item in enumerate(result):
+        if item:
+            nb = item[-2]
+            if nb not in items:
+                items[nb] = item + [[i]]
+            else:
+                items[nb][-1].append(i)
+                
+                # selecting the minimum RMSD
+                if item[1] < items[nb][1]:
+                    items[nb][1] = item[1]
+                    items[nb][2] = item[2]
+    
+    columns = ['SIZE', 'RMSD', 'RMSDSIZE', 'PRIM', 'SCND', 'TRAN']
+    tab     = []
+    for code in rures:
+        tab.append([0, None, None, rsstruct.name, code, None])
+    for code in qures:
+        tab.append([0, None, None, qsstruct.name, code, None])
+    
+    for item in items.values():
+        seeds = item[-1]
+        seeds = ','.join(['='.join(cpairs[i]) for i in seeds])
+        pairs = item[-3]
+        pairs = ','.join('='.join([r_code[m], q_code[n]]) for m, n in pairs)
+        tab.append([*item[:3], seeds, pairs, item[4]])
+    tab = pd.DataFrame(tab, columns=columns)
+    
+    tab.sort_values(
+        ['SIZE', 'RMSDSIZE'], 
+        ascending=[True, False], 
+        inplace=True
+    )
+    tab.index = range(1, len(tab) + 1)
+    tab.index.name = 'ID'
+    tab.to_csv(
+        sys.stdout,
+        columns=['SIZE', 'RMSD', 'RMSDSIZE', 'PRIM', 'SCND'],
+        sep='\t',
+        float_format='{:0.3f}'.format
+    )
+    
+    if saveto:
+        if threads != 1:
+            pool.map(saver, tab[tab['SIZE'] > 0].iloc)
+        else:
+            for item in tab[tab['SIZE'] > 0].iloc:
+                saver(item)
