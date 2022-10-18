@@ -10,7 +10,7 @@ pd.to_numeric.__defaults__ = 'ignore', None
 class Structure:
     count = 0
     
-    def __init__(self, name:str = '') -> None:
+    def __init__(self, name:'str' = '') -> 'None':
         if not name:
             Structure.count += 1
             name = 'struct_{}'.format(Structure.count)
@@ -20,30 +20,65 @@ class Structure:
         self.fmt  = None # str
     
     
-    def __str__(self) -> str:
+    def __str__(self) -> 'str':
         return self.name
     
-    def __repr__(self) -> str:
+    def __repr__(self) -> 'str':
         return '<{} Structure>'.format(self)
     
     
-    def rename(self, name:str) -> None:
+    def rename(self, name:'str') -> 'None':
         self.name = name
     
-    def set_tab(self, tab:pd.DataFrame) -> None:
+    def set_tab(self, tab:'pd.DataFrame') -> 'None':
         self.tab = tab
     
-    def get_tab(self) -> pd.DataFrame:
+    def get_tab(self) -> 'pd.DataFrame':
         return self.tab
     
     
-    def set_fmt(self, fmt:str) -> None:
+    def set_fmt(self, fmt:'str') -> 'None':
         self.fmt = fmt
     
-    def get_fmt(self) -> str:
+    def get_fmt(self) -> 'str':
         return self.fmt
     
-    def saveto(self, folder:str, fmt:str = None) -> None:
+    
+    def one_letter_chain_renaming(tab:'pd.DataFrame'):
+        if not hasattr(Structure, 'chain_labels'):
+            from string import ascii_letters, digits
+            chain_labels = sorted(ascii_letters) + list(digits)
+            Structure.chain_labels = chain_labels
+        else:
+            chain_labels = Structure.chain_labels
+        
+        cur_chain_labels = tab['auth_asym_id'].astype(str).unique()
+        allowed_labels = sorted(set(chain_labels) - set(cur_chain_labels))
+        
+        rnm = {}
+        cnt = 0
+        for lbl in cur_chain_labels:
+            if len(lbl) > 1:
+                try:
+                    rnm[lbl] = allowed_labels[cnt]
+                except IndexError:
+                    raise IndexError('One-letter chain renaming is not possible. Number of chains exceeds the limit 62.')
+                cnt += 1
+        
+        msg = []
+        if cnt:
+            tab = tab.copy()
+            tab['auth_asym_id'].replace(rnm, inplace=True)
+
+            for k, v in sorted(rnm.items(), key=lambda x:x[1]):
+                rmk = REMARK_FORMAT.format(k, v)
+                rmk += ' ' * (80 - len(rmk)) + '\n'
+                msg.append(rmk)
+        
+        return tab, msg
+
+    
+    def saveto(self, folder:'str', fmt:'str' = None) -> 'None':
         os.makedirs(folder, exist_ok=True)
         tab  = self.tab
         
@@ -59,10 +94,13 @@ class Structure:
         
         if fmt == 'PDB':
             if self.fmt != fmt:
+                tab, msg = Structure.one_letter_chain_renaming(tab)
                 tab = tab.replace('.', '')
                 tab.replace('?', '', inplace=True)
+            else:
+                msg = []
             
-            text = ''
+            text = ''.join(msg)
             for model_num, tt in tab.groupby('pdbx_PDB_model_num', sort=False):
                 text += MODEL_FORMAT.format(model_num)
                 tt['id'] = range(1, len(tt) + 1)
@@ -107,7 +145,7 @@ class Structure:
         file.close()
     
     
-    def apply_transform(self, transform):
+    def apply_transform(self, transform) -> 'Structure':
         cols  = ['Cartn_x', 'Cartn_y', 'Cartn_z']
         tab   = self.tab.copy()
         
@@ -122,82 +160,156 @@ class Structure:
         return struct
     
     
-    def get_sub_struct(self, res:str):
+    def _res_split(res:'str') -> 'dict':
         '''
         res = [#[modelIdInt]][/[asymIdStr]][:[compIdStr][_seqIdInt1[compIdStr|_seqIdInt2]]
         '''
         
-        tab  = self.tab
-        data = {'#': None, '/': None, ':': None}
-        
+        spl = {'#': None, '/': None, ':': None}
         gen = iter(res)
         c   = next(gen, False)
+        
         while c:
-            if c in data.keys():
-                data[c] = ''
-                cc      = next(gen, False)
-                while cc and cc not in data.keys():
-                    data[c] += cc
-                    cc      = next(gen, False)
+            if c in spl.keys():
+                spl[c] = ''
+                cc = next(gen, False)
+                while cc and cc not in spl.keys():
+                    spl[c] += cc
+                    cc = next(gen, False)
                 else:
                     c = cc
         
-        val = data['#']
-        if val:
-            val     = int(val)
-            cur_tab = tab[tab['pdbx_PDB_model_num'].eq(val)]
-        elif val is None:
-            val     = tab['pdbx_PDB_model_num'][0]
-            cur_tab = tab[tab['pdbx_PDB_model_num'].eq(val)]
+        if spl['#']:
+            spl['#'] = int(spl['#'])
         else:
-            cur_tab = tab
+            if spl['#'] == None:
+                spl['#'] = 1
         
-        val = data['/']
-        if val:
-            val     = cur_tab['auth_asym_id'].dtype.type(val)
-            cur_tab = cur_tab[cur_tab['auth_asym_id'].eq(val)]
+        if spl[':']:
+            rng = spl[':'].split('_')
+            if len(rng) == 3:
+                rng[1] = int(rng[1])
+                rng[2] = int(rng[2])
+            elif len(rng) == 2:
+                if rng[1].isdigit():
+                    rng[1] = int(rng[1])
+            spl[':'] = rng
         
-        val = data[':']
-        if val:
-            vals   = val.split('_')
-            res_id = ''
-            
-            if len(vals) == 2:
-                res_id, seq_id = vals
-                
-                if seq_id.isdigit():
-                    seq_id  = int(seq_id)
-                    cur_tab = cur_tab[cur_tab['auth_seq_id'].eq(seq_id)]
+        return spl
+    
+    
+    def get_res_msk(self, res: 'str') -> 'pd.Series':
+        tab = self.tab
+        spl = Structure._res_split(res)
+        
+        mod = spl['#']
+        if mod:
+            mod_msk = tab['pdbx_PDB_model_num'].eq(mod)
+        else:
+            mod_msk = tab['pdbx_PDB_model_num'].astype(bool)
+        
+        chn = spl['/']
+        if chn:
+            chn_msk = tab['auth_asym_id'].eq(chn)
+        else:
+            chn_msk = tab['auth_asym_id'].astype(bool)
+        
+        rng  = spl[':']
+        if rng:
+            case = len(rng)
+        else:
+            case = 0
+        
+        # res wo ':'
+        if case == 0:
+            rng_msk = tab['auth_seq_id'].astype(bool)
+       
+        # ':N'
+        elif case == 1:
+            res = rng[0]
+            if res:
+                rng_msk = tab['auth_comp_id'].eq(rng[0])
+            else:
+                rng_msk = tab['auth_comp_id'].astype(bool)
+        
+        #':_num' | ':_numN' | ':N_num' | ':N1_numN2'
+        elif case == 2:
+            res, num  = rng
+            if type(num) == int:
+                if res:
+                    rng_msk = tab['auth_seq_id'].eq(num) \
+                        & tab['auth_comp_id'].eq(res)
                 else:
-                    for i, c in enumerate(seq_id):
-                        if not c.isdigit():
-                            break
-                    seq_id_d = int(seq_id[:i])
-                    cur_tab  = cur_tab[cur_tab['auth_seq_id'].eq(seq_id_d)]
-                    
-                    seq_id_s = seq_id[i:]
-                    cur_tab  = cur_tab[cur_tab['auth_comp_id'].eq(seq_id_s)]
-            
-            elif len(vals) == 3:
-                res_id, seq_id_1, seq_id_2 = vals
-                
-                seq_id_1 = int(seq_id_1)
-                seq_id_2 = int(seq_id_2)
-                cur_tab  = cur_tab[
-                    cur_tab['auth_seq_id'].between(seq_id_1, seq_id_2)
-                ]
-            
-            if res_id:
-                cur_tab = cur_tab[cur_tab['auth_comp_id'].eq(res_id)]
+                    rng_msk = tab['auth_seq_id'].eq(num)
+            else:
+                # ':N1_numN2' = ':_numN2' even if N1 != N2
+                dgt = ''
+                for i, c in enumerate(num):
+                    if c.isdigit():
+                        dgt += c
+                    else:
+                        break
+                res = num[i:]
+                num = int(dgt)
+                rng_msk = tab['auth_seq_id'].eq(num) \
+                    & tab['auth_comp_id'].eq(res)
         
-        struct = Structure(self.name)
-        struct.set_tab(cur_tab)
-        struct.set_fmt(self.fmt)
+        # ':_num1_num2' | ':N_num1_num2'
+        elif case == 3:
+            res, num_1, num_2 = rng
+            if res:
+                rng_msk = tab['auth_comp_id'].eq(res) \
+                    & tab['auth_seq_id'].between(num_1, num_2)
+            else:
+                rng_msk = tab['auth_seq_id'].between(num_1, num_2)
         
-        return struct
+        # incorrect res
+        else:
+            rng_msk = tab['auth_seq_id'].astype(bool) ^ True
+        
+        msk = mod_msk & chn_msk & rng_msk
+        
+        return msk
     
     
-    def drop_duplicates_alt_id(self, keep:str = 'last') -> None:
+    def get_res_substruct(self, res:'str', neg:'bool' = False) -> 'Structure':
+        
+        tab = self.tab
+        msk = self.get_res_msk(res)
+        if neg:
+            msk ^=True
+        tab = tab[msk]
+        
+        structure = Structure(self.name)
+        structure.set_tab(tab)
+        structure.set_fmt(self.fmt)
+        
+        return structure
+    
+    def add_code_msk(self) -> None:
+        tab = self.tab
+        code_msk = tab['pdbx_PDB_model_num'].astype(str)\
+            + '.' + tab['auth_asym_id'].astype(str)\
+            + '.' + tab['auth_comp_id'].astype(str)\
+            + '.' + tab['auth_seq_id'].astype(str)\
+            + '.' + tab['pdbx_PDB_ins_code'].astype(str).replace('?', '')
+        self.code_msk = code_msk
+    
+    
+    def get_res_code(self, res:'str' = '', neg:'bool' = False) -> 'list':
+        if not hasattr(self, 'code_msk'):
+            self.add_code_msk()
+        
+        code_msk = self.code_msk
+        msk = self.get_res_msk(res)
+        if neg:
+            msk ^= True
+        res_code = code_msk[msk].unique().tolist()
+        
+        return res_code
+    
+    
+    def drop_duplicates_alt_id(self, keep:'str' = 'last') -> 'None':
         self.tab.drop_duplicates(
             [
                 'pdbx_PDB_model_num', 
@@ -212,26 +324,27 @@ class Structure:
         )
     
     
-    def artem_desc(self, res_repr:dict[str:list]):
+    def artem_desc(self, seed_res_repr):
+        if not hasattr(self, 'code_msk'):
+            self.add_code_msk()
+        
         tab  = self.tab.set_index('auth_atom_id')
-        mask = tab['pdbx_PDB_model_num'].astype(str)\
-               + '.' + tab['auth_asym_id'].astype(str)\
-               + '.' + tab['auth_comp_id'].astype(str)\
-               + '.' + tab['auth_seq_id'].astype(str)\
-               + '.' + tab['pdbx_PDB_ins_code'].astype(str).replace('?', '')
+        code_msk = self.code_msk.set_axis(tab.index)
         
         rres = []
         ures = []
-        for code, t in tab[['Cartn_x', 'Cartn_y', 'Cartn_z']].groupby(mask, sort=False):
+        
+        Cartn_cols = ['Cartn_x', 'Cartn_y', 'Cartn_z']
+        for code, t in tab[Cartn_cols].groupby(code_msk, sort=False):
             res_id = code.split('.', 3)[-2]
-            if res_id not in res_repr.keys():
+            if res_id not in seed_res_repr.keys():
                 ures.append(code)
                 continue
             
             flg = False
             c   = []
             
-            for r in res_repr[res_id]:
+            for r in seed_res_repr[res_id]:
                 m = []
                 for rr in r:
                     try:
@@ -262,7 +375,7 @@ class Structure:
 
 
 
-def parser(path:str, fmt:str = 'PDB', name:str = '') -> Structure:
+def parser(path:'str', fmt:'str' = 'PDB', name:'str' = '') -> 'Structure':
     if fmt == 'PDB':
         columns = (
             'group_PDB',
@@ -371,7 +484,8 @@ def parser(path:str, fmt:str = 'PDB', name:str = '') -> Structure:
     return struct
 
 
-ATOM_FORMAT  = '{group_PDB:<6}{id:>5} {auth_atom_id:<4}{label_alt_id:1}{auth_comp_id:>3}{auth_asym_id:>2}{auth_seq_id:>4}{pdbx_PDB_ins_code:1}   {Cartn_x:>8.3f}{Cartn_y:>8.3f}{Cartn_z:>8.3f}{occupancy:>6.2f}{B_iso_or_equiv:>6.2f}          {type_symbol:>2}{pdbx_formal_charge:>2}\n'
-TER_FORMAT   = 'TER   {id:>5}      {auth_comp_id:>3}{auth_asym_id:>2}{auth_seq_id:>4}                                                      \n'
-MODEL_FORMAT = 'MODEL     {:>4}                                                                  \n'
-ENDMDL       = 'ENDMDL                                                                          \n'
+ATOM_FORMAT   = '{group_PDB:<6}{id:>5} {auth_atom_id:<4}{label_alt_id:1}{auth_comp_id:>3}{auth_asym_id:>2}{auth_seq_id:>4}{pdbx_PDB_ins_code:1}   {Cartn_x:>8.3f}{Cartn_y:>8.3f}{Cartn_z:>8.3f}{occupancy:>6.2f}{B_iso_or_equiv:>6.2f}          {type_symbol:>2}{pdbx_formal_charge:>2}\n'
+TER_FORMAT    = 'TER   {id:>5}      {auth_comp_id:>3}{auth_asym_id:>2}{auth_seq_id:>4}                                                      \n'
+MODEL_FORMAT  = 'MODEL     {:>4}                                                                  \n'
+ENDMDL        = 'ENDMDL                                                                          \n'
+REMARK_FORMAT = 'REMARK 250 CHAIN RENAMING {} -> {}'

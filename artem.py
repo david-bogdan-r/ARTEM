@@ -1,6 +1,7 @@
 import sys
 import os
 import itertools
+import gc
 
 import pandas as pd
 import numpy  as np
@@ -10,12 +11,18 @@ from scipy.spatial import KDTree
 from lib import nar
 from lib import pdb
 
+
 # ignore SettingWithCopyWarning
 pd.set_option('mode.chained_assignment', None)
 
 
 rres    = ''
 qres    = ''
+rresneg = ''
+qresneg = ''
+rseed   = ''
+qseed   = ''
+
 rformat = 'PDB'
 qformat = 'PDB'
 
@@ -33,6 +40,9 @@ saveformat = 'PDB'
 
 threads = 1
 
+# Keep alternative atom locations: 'first', 'last', False
+keep = 'last'
+
 seed_res_repr = (
     # For primary alignment
     nar.five_atom_repr,
@@ -46,12 +56,10 @@ seed_res_repr = (
     # To calculate the RMSD
     nar.three_atom_repr,
 )
-
-# Keep alternative atom locations: 'first', 'last', False
-keep = 'last'
+seed_res_repr = nar.join_res_repr(seed_res_repr)
 
 
-def get_transform(r:np.ndarray, q:np.ndarray):
+def get_transform(r:'np.ndarray', q:'np.ndarray'):
     r_avg = r.mean(axis=0)
     q_avg = q.mean(axis=0)
     
@@ -70,17 +78,17 @@ def get_transform(r:np.ndarray, q:np.ndarray):
     return rot, tran
 
 
-def RMSD(r:np.ndarray, q:np.ndarray) -> float:
+def RMSD(r:'np.ndarray', q:'np.ndarray') -> 'float':
     diff = r - q
     return np.sqrt(np.sum(np.sum(np.multiply(diff, diff))) / len(r))
 
 
-def apply_transform(coord:np.ndarray, rotran):
+def apply_transform(coord:'np.ndarray', rotran):
     rot, tran = rotran
     return np.dot(coord, rot) + tran
 
 
-def mutual_nb(dist) -> list:
+def mutual_nb(dist) -> 'list':
     '''
     dist: list of [rresId1, qresId2, distance]
     '''
@@ -149,7 +157,7 @@ def task(m, n):
     return [size, rmsd, rmsdsize, tuple(nb), transform]
 
 
-def saver(item:pd.Series) -> None:
+def saver(item:'pd.Series') -> None:
     struct = sstruct.apply_transform(item['TRAN'])
     struct.rename('{}_{}'.format(struct, item.name))
     struct.saveto(saveto, saveformat)
@@ -157,32 +165,41 @@ def saver(item:pd.Series) -> None:
 
 
 if  __name__ == '__main__':
+    # Processing inputs
+    
     kwargs = dict([arg.split('=') for arg in sys.argv[1:]])
     
     threads = int(kwargs.get('threads', threads))
     if threads != 1:
-        try:
-            mp.set_start_method('fork')
-        except:
-            print(
-                'Multiprocessing is available only for UNIX systems', 
-                file=sys.stderr
-            )
-            threads = 1
+        # Multiprocessing is available only for UNIX-like systems
+        mp.set_start_method('fork')
+        
+        if threads < 0:
+            threads = mp.cpu_count()
+        else:
+            threads = min(threads, mp.cpu_count())
     
     r       = kwargs.get('r')
-    q       = kwargs.get('q')
     rres    = kwargs.get('rres', rres)
-    qres    = kwargs.get('qres', qres)
+    rresneg = kwargs.get('rresneg', rresneg)
+    rseed   = kwargs.get('rseed', rseed)
     rformat = kwargs.get('rformat', rformat)
+    
+    q       = kwargs.get('q')
+    qres    = kwargs.get('qres', qres)
+    qresneg = kwargs.get('qresneg', qresneg)
+    qseed   = kwargs.get('qseed', qseed)
     qformat = kwargs.get('qformat', qformat)
     
     sizemin     = float(kwargs.get('sizemin', sizemin))
     sizemax     = float(kwargs.get('sizemax', sizemax))
+    
     rmsdmin     = float(kwargs.get('rmsdmin', rmsdmin))
     rmsdmax     = float(kwargs.get('rmsdmax', rmsdmax))
+    
     rmsdsizemin = float(kwargs.get('rmsdsizemin', rmsdsizemin))
     rmsdsizemax = float(kwargs.get('rmsdsizemax', rmsdsizemax))
+    
     matchrange  = float(kwargs.get('matchrange', matchrange))
     
     saveto     = kwargs.get('saveto', saveto)
@@ -191,81 +208,101 @@ if  __name__ == '__main__':
     rname, rext = r.split(os.sep)[-1].split('.')
     qname, qext = q.split(os.sep)[-1].split('.')
     
-    rext = rext.upper()
-    qext = qext.upper()
+    available_format = {'PDB', 'CIF'}
     
-    if rext in ['PDB', 'CIF']:
+    rext = rext.upper()
+    if rext in available_format:
         rformat = rext
     
-    if qext in ['PDB', 'CIF']:
+    qext = qext.upper()
+    if qext in available_format:
         qformat = qext
     
     saveformat = kwargs.get('saveformat', qformat)
     
-    rstruct = pdb.parser(r, rformat, rname)
-    qstruct = pdb.parser(q, qformat, qname)
     
+    # Model preprocessing
+    
+    rstruct  = pdb.parser(r, rformat, rname)
     rstruct.drop_duplicates_alt_id(keep=keep)
-    qstruct.drop_duplicates_alt_id(keep=keep)
-    
-    rsstruct = rstruct.get_sub_struct(rres)
-    qsstruct = qstruct.get_sub_struct(qres)
-    
-    if saveto:
-        if saveres:
-            sstruct = qstruct.get_sub_struct(saveres)
-        else:
-            sstruct = qsstruct
-    
-    carrier = set.intersection(
-        *map(
-            lambda x: set(x.keys()),
-            seed_res_repr
-        )
+    rnegcase = bool(rresneg)
+    rsstruct = rstruct.get_res_substruct(
+        [rres, rresneg][rnegcase],
+        rnegcase
     )
-    res_repr = {}
-    for res in carrier:
-        res_repr[res] = [rr[res] for rr in  seed_res_repr]
-    
-    rrres, rures = rsstruct.artem_desc(res_repr)
-    qrres, qures = qsstruct.artem_desc(res_repr)
-    
-    if not rrres or not qrres:
-        columns = ['SIZE', 'RMSD', 'RMSDSIZE', 'PRIM', 'SCND', 'TRAN']
-        tab     = []
-        for code in rures:
-            tab.append([0, None, None, rsstruct.name, code, None])
-        for code in qures:
-            tab.append([0, None, None, qsstruct.name, code, None])
-        tab = pd.DataFrame(tab, columns=columns)
-        tab.index = range(1, len(tab) + 1)
-        tab.index.name = 'ID'
-        tab.to_csv(
-            sys.stdout,
-            columns=['SIZE', 'RMSD', 'RMSDSIZE', 'PRIM', 'SCND'],
-            sep='\t',
-            float_format='{:0.3f}'.format
+    rrres, rures = rsstruct.artem_desc(seed_res_repr)
+    if not rrres:
+        msg = 'No {}={} nucleotides in the {} for seed'.format(
+            ['rres', 'rresneg'][rnegcase],
+            [rres, rresneg][rnegcase],
+            r
         )
-        exit()
+        raise ValueError(msg)
+    rseed_code = rsstruct.get_res_code(rseed)
+    if not rseed_code:
+        msg = 'No rseed={} nucleotides in the {}={} for seed {}'.format(
+            rseed,
+            ['rres', 'rresneg'][rnegcase],
+            [rres, rresneg][rnegcase],
+            r
+        )
+        raise ValueError(msg)
+    
     
     r_code, r_prim, r_avg, r_scnd, r_eval = zip(*rrres)
-    q_code, q_prim, q_avg, q_scnd, q_eval = zip(*qrres)
-    
     r_avg = np.vstack(r_avg)
-    q_avg = np.vstack(q_avg)
+    rseed_code = set(r_code) & set(rseed_code)
+    r_ind = [i for i, code in enumerate(r_code) if code in rseed_code]
     
-    cpairs = list(itertools.product(r_code, q_code))
-    ipairs = itertools.product(range(len(r_code)), range(len(q_code)))
+    
+    qstruct  = pdb.parser(q, qformat, qname)
+    qstruct.drop_duplicates_alt_id(keep=keep)
+    qnegcase = bool(qresneg)
+    qsstruct = qstruct.get_res_substruct(
+        [qres, qresneg],
+        qnegcase
+    )
+    qrres, qures = qsstruct.artem_desc(seed_res_repr)
+    if not qrres:
+        msg = 'No {}={} nucleotides in the {} for seed'.format(
+            ['qres', 'qresneg'][qnegcase],
+            [qres, qresneg][qnegcase],
+            q
+        )
+        raise ValueError(msg)
+    qseed_code = qsstruct.get_res_code(qseed)
+    if not qseed_code:
+        msg = 'No qseed={} nucleotides in the {}={} for seed {}'.format(
+            qseed,
+            ['qres', 'qresneg'][qnegcase],
+            [qres, qresneg][qnegcase],
+            q
+        )
+        raise ValueError(msg)
+    
+    q_code, q_prim, q_avg, q_scnd, q_eval = zip(*qrres)
+    q_avg = np.vstack(q_avg)
+    qseed_code = set(q_code) & set(qseed_code)
+    q_ind = [i for i, code in enumerate(q_code) if code in qseed_code]
+    
+    indx_pairs = list(itertools.product(r_ind, q_ind))
     
     r_avg_tree = KDTree(r_avg)
     if threads == 1:
-        result = [task(m, n) for m, n in ipairs]
+        result = [task(m, n) for m, n in indx_pairs]
     else:
-        if threads == -1:
-            pool = mp.Pool(mp.cpu_count())
-        else:
-            pool = mp.Pool(min(threads, mp.cpu_count()))
-        result = pool.starmap(task, ipairs)
+        pool = mp.Pool(threads)
+        
+        delta   = 15 * threads
+        cnt     = 0
+        cnt_max = len(indx_pairs)
+        result  = []
+        while cnt < cnt_max:
+            result.extend(
+                pool.starmap(task, indx_pairs[cnt:cnt + delta])
+            )
+            cnt += delta
+    gc.collect()
     
     items = {}
     for i, item in enumerate(result):
@@ -290,10 +327,17 @@ if  __name__ == '__main__':
     
     for item in items.values():
         seeds = item[-1]
-        seeds = ','.join(['='.join(cpairs[i]) for i in seeds])
-        pairs = item[-3]
-        pairs = ','.join('='.join([r_code[m], q_code[n]]) for m, n in pairs)
-        tab.append([*item[:3], seeds, pairs, item[4]])
+        seeds_code = []
+        for ind in seeds:
+            i, j = indx_pairs[ind]
+            seeds_code.append('='.join([r_code[i], q_code[j]]))
+        seeds_code = ','.join(seeds_code)
+        
+        match_code = []
+        for i, j in item[-3]:
+            match_code.append('='.join([r_code[i], q_code[j]]))
+        match_code = ','.join(match_code)
+        tab.append([*item[:3], seeds_code, match_code, item[4]])
     tab = pd.DataFrame(tab, columns=columns)
     
     tab.sort_values(
@@ -311,7 +355,12 @@ if  __name__ == '__main__':
     )
     
     if saveto:
+        if saveres:
+            sstruct = qstruct.get_res_substruct(saveres)
+        else:
+            sstruct = qsstruct
         if threads != 1:
+            pool = mp.Pool(threads)
             pool.map(saver, tab[tab['SIZE'] > 0].iloc)
         else:
             for item in tab[tab['SIZE'] > 0].iloc:

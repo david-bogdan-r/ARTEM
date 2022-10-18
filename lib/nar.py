@@ -74,6 +74,21 @@ three_atom_repr = {
 }
 
 
+def join_res_repr(seed_res_repr:'tuple') -> 'dict':
+    carrier = set.intersection(
+        *map(
+            lambda x: set(x.keys()),
+            seed_res_repr
+        )
+    )
+    
+    res_repr = {}
+    for res in carrier:
+        res_repr[res] = [rr[res] for rr in  seed_res_repr]
+    
+    return res_repr
+
+
 if __name__.endswith('nar'):
     from pandas import Index
 
