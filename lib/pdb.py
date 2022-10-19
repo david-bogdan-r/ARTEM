@@ -16,9 +16,8 @@ class Structure:
             name = 'struct_{}'.format(Structure.count)
         
         self.name = name
-        self.tab  = None # pandas.DataFrame
-        self.fmt  = None # str
-    
+        self.tab  = None # pandas.DataFrame to store the atom_site table
+        self.fmt  = None # str to store the table format [CIF or PDB]
     
     def __str__(self) -> 'str':
         return self.name
@@ -29,6 +28,7 @@ class Structure:
     
     def rename(self, name:'str') -> 'None':
         self.name = name
+    
     
     def set_tab(self, tab:'pd.DataFrame') -> 'None':
         self.tab = tab
@@ -45,6 +45,10 @@ class Structure:
     
     
     def one_letter_chain_renaming(tab:'pd.DataFrame'):
+        '''
+        When converting from CIF to PDB format, the chain labels are translated into a one-letter code
+        '''
+        
         if not hasattr(Structure, 'chain_labels'):
             from string import ascii_letters, digits
             chain_labels = sorted(ascii_letters) + list(digits)
@@ -146,6 +150,12 @@ class Structure:
     
     
     def apply_transform(self, transform) -> 'Structure':
+        '''
+        transform = (rot, tran)
+        rot  - rotation matrix with 3x3 shape
+        tran - displacement vector with 1x3 shape
+        '''
+        
         cols  = ['Cartn_x', 'Cartn_y', 'Cartn_z']
         tab   = self.tab.copy()
         
@@ -161,10 +171,6 @@ class Structure:
     
     
     def _res_split(res:'str') -> 'dict':
-        '''
-        res = [#[modelIdInt]][/[asymIdStr]][:[compIdStr][_seqIdInt1[compIdStr|_seqIdInt2]]
-        '''
-        
         spl = {'#': None, '/': None, ':': None}
         gen = iter(res)
         c   = next(gen, False)
@@ -273,6 +279,12 @@ class Structure:
     
     
     def get_res_substruct(self, res:'str', neg:'bool' = False) -> 'Structure':
+        '''
+        res=[#[modelIdInt]][/[asymIdStr]][:[compIdStr][_seqIdInt1[compIdStr|_seqIdInt2]]
+        
+        Returns a Structure object with residues, which are defined by res string.
+        If neg is True, the returned structure contains residues that are not defined by res string.
+        '''
         
         tab = self.tab
         msk = self.get_res_msk(res)
@@ -285,6 +297,7 @@ class Structure:
         structure.set_fmt(self.fmt)
         
         return structure
+    
     
     def add_code_msk(self) -> None:
         tab = self.tab
@@ -397,39 +410,36 @@ def parser(path:'str', fmt:'str' = 'PDB', name:'str' = '') -> 'Structure':
             'pdbx_PDB_model_num',
         )
         
-        item_mask = (
-            slice(0,   6),  # group_PDB
-            slice(6,  11),  # id
-            slice(12, 16),  # auth_atom_id
-            slice(16, 17),  # label_alt_id
-            slice(17, 20),  # auth_comp_id
-            slice(20, 22),  # auth_asym_id
-            slice(22, 26),  # auth_seq_id
-            slice(26, 27),  # pdbx_PDB_ins_code
-            slice(30, 38),  # Cartn_x
-            slice(38, 46),  # Cartn_y
-            slice(46, 54),  # Cartn_z
-            slice(54, 60),  # occupancy
-            slice(60, 66),  # B_iso_or_equiv
-            slice(76, 78),  # type_symbol
-            slice(78, 80)   # pdbx_formal_charge
-        )
-        
         rec_names = {'ATOM  ', 'HETATM'}
-        rec_name  = slice(0, 6)
         
+        cur_model = 1
         items     = []
-        cur_model = [1]
         
         file = open(path, 'r')
         for line in file:
-            rec = line[rec_name]
+            rec = line[0:6]
             if rec in rec_names:
-                item = map(line.__getitem__, item_mask)
-                item = map(str.strip, item)
-                items.append(list(item) + cur_model)
+                item = [
+                    line[0 : 6].strip(), # group_PDB
+                    line[6 :11].strip(), # id
+                    line[12:16].strip(), # auth_atom_id
+                    line[16:17].strip(), # label_alt_id
+                    line[17:20].strip(), # auth_comp_id
+                    line[20:22].strip(), # auth_asym_id
+                    line[22:26].strip(), # auth_seq_id
+                    line[26:27].strip(), # pdbx_PDB_ins_code
+                    line[30:38].strip(), # Cartn_x
+                    line[38:46].strip(), # Cartn_y
+                    line[46:54].strip(), # Cartn_z
+                    line[54:60].strip(), # occupancy
+                    line[60:66].strip(), # B_iso_or_equiv
+                    line[76:78].strip(), # type_symbol
+                    line[78:80].strip(), # pdbx_formal_charge
+                    cur_model            # pdbx_PDB_model_num
+                ]
+                items.append(item)
             elif rec == 'MODEL ':
-                cur_model = [int(line.split()[1])]
+                cur_model = int(line.split()[1])
         file.close()
         
         tab = pd.DataFrame(items, columns=columns)
@@ -437,9 +447,8 @@ def parser(path:'str', fmt:'str' = 'PDB', name:'str' = '') -> 'Structure':
         tab.fillna('', inplace=True)
     
     elif fmt == 'CIF':
-        file = open(path, 'r')
-        text = file.read()
-        file.close()
+        with open(path, 'r') as file:
+            text = file.read()
         
         start = text.find('_atom_site.')
         end   = text.find('#', start) - 1
@@ -455,7 +464,6 @@ def parser(path:'str', fmt:'str' = 'PDB', name:'str' = '') -> 'Structure':
         items = map(str.split, tab[i:])
         tab   = pd.DataFrame(items, columns=columns)
         tab   = tab.apply(pd.to_numeric)
-        
         
         auth  = [
             'auth_asym_id',
@@ -480,7 +488,7 @@ def parser(path:'str', fmt:'str' = 'PDB', name:'str' = '') -> 'Structure':
     struct = Structure(name)
     struct.set_tab(tab)
     struct.set_fmt(fmt)
-
+    
     return struct
 
 

@@ -1,7 +1,6 @@
 import sys
 import os
 import itertools
-import gc
 
 import pandas as pd
 import numpy  as np
@@ -259,7 +258,7 @@ if  __name__ == '__main__':
     qstruct.drop_duplicates_alt_id(keep=keep)
     qnegcase = bool(qresneg)
     qsstruct = qstruct.get_res_substruct(
-        [qres, qresneg],
+        [qres, qresneg][qnegcase],
         qnegcase
     )
     qrres, qures = qsstruct.artem_desc(seed_res_repr)
@@ -302,7 +301,6 @@ if  __name__ == '__main__':
                 pool.starmap(task, indx_pairs[cnt:cnt + delta])
             )
             cnt += delta
-    gc.collect()
     
     items = {}
     for i, item in enumerate(result):
