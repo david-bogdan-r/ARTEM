@@ -91,7 +91,7 @@ def join_res_repr(seed_res_repr:'tuple') -> 'dict':
 
 if __name__.endswith('nar'):
     from pandas import Index
-
+    
     loc = locals().copy()
     for k, v in loc.items():
         if not k.startswith('_') and type(v) == dict:
