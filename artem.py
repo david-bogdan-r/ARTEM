@@ -35,7 +35,6 @@ matchrange  = 3.
 
 saveto     = None
 saveres    = None
-saveformat = 'PDB'
 
 threads = 1
 
@@ -159,6 +158,8 @@ def task(m, n):
 def saver(item:'pd.Series') -> None:
     struct = sstruct.apply_transform(item['TRAN'])
     struct.rename('{}_{}'.format(struct, item.name))
+    if saveformat == 'PDB':
+        struct.tab['pdbx_PDB_model_num'] = item.name
     struct.saveto(saveto, saveformat)
 
 
@@ -217,8 +218,15 @@ if  __name__ == '__main__':
     if qext in available_format:
         qformat = qext
     
-    saveformat = kwargs.get('saveformat', qformat)
+    saveformat = kwargs.get('saveformat', qformat).upper()
     
+    if saveformat not in available_format:
+        if saveformat == 'MMCIF':
+            saveformat = 'CIF'
+        else:
+            msg = 'Invalid saveformat value. Acceptable values for saveformat'
+            msg+= 'are PDB, CIF or MMCIF (case-insensitive)'
+            raise TypeError(msg)
     
     # Model preprocessing
     
@@ -284,6 +292,9 @@ if  __name__ == '__main__':
     qseed_code = set(q_code) & set(qseed_code)
     q_ind = [i for i, code in enumerate(q_code) if code in qseed_code]
     
+    
+    # ARTEM Computations 
+    
     indx_pairs = list(itertools.product(r_ind, q_ind))
     
     r_avg_tree = KDTree(r_avg)
@@ -301,6 +312,9 @@ if  __name__ == '__main__':
                 pool.starmap(task, indx_pairs[cnt:cnt + delta])
             )
             cnt += delta
+    
+    
+    # Output and Saving
     
     items = {}
     for i, item in enumerate(result):

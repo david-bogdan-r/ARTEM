@@ -57,7 +57,8 @@ class Structure:
             chain_labels = Structure.chain_labels
         
         cur_chain_labels = tab['auth_asym_id'].astype(str).unique()
-        allowed_labels = sorted(set(chain_labels) - set(cur_chain_labels))
+        allowed_labels = sorted(set(chain_labels) - set(cur_chain_labels), 
+                                key=lambda x: (x.isdigit(), x.islower(), x))
         
         rnm = {}
         cnt = 0
