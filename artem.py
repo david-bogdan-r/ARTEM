@@ -22,8 +22,6 @@ rres    = ''
 qres    = ''
 rresneg = ''
 qresneg = ''
-rseed   = ''
-qseed   = ''
 
 rmsdmin     = 0.
 rmsdmax     = 1e10
@@ -227,8 +225,11 @@ if  __name__ == '__main__':
     
     r       = kwargs.get('r')
     rres    = kwargs.get('rres', rres)
+    
     rresneg = kwargs.get('rresneg', rresneg)
-    rseed   = kwargs.get('rseed', rseed)
+    rneg    = bool(rresneg)
+    rseed   = kwargs.get('rseed', (rres, rresneg)[rneg])
+    
     rformat = kwargs.get('rformat', None)
     rname, rext = r.split(os.sep)[-1].split('.')
     rext = rext.upper()
@@ -243,7 +244,8 @@ if  __name__ == '__main__':
     q       = kwargs.get('q')
     qres    = kwargs.get('qres',    qres)
     qresneg = kwargs.get('qresneg', qresneg)
-    qseed   = kwargs.get('qseed',   qseed)
+    qneg    = bool(qresneg)
+    qseed   = kwargs.get('qseed', (qres, qresneg)[qneg])
     qformat = kwargs.get('qformat', None)
     qname, qext = q.split(os.sep)[-1].split('.')
     qext = qext.upper()
@@ -272,17 +274,17 @@ if  __name__ == '__main__':
     rstruct  = pdb.parser(r, rformat, rname)
     rstruct.drop_duplicates_alt_id(keep=keep)
     
-    rneg = bool(rresneg)
     rresstuct = rstruct.get_res_substruct(
         (rres, rresneg)[rneg],
         rneg
     )
     rdata, rnoise = describe(rresstuct)
     if not rdata:
-        msg = 'No {}={} nucleotides in the {} for seed'.format(
+        msg = 'No {}={} nucleotides in the r={} for rseed={}'.format(
             ('rres', 'rresneg')[rneg],
             (rres, rresneg)[rneg],
-            r
+            r,
+            rseed
         )
         raise Exception(msg)
     else:
@@ -291,7 +293,7 @@ if  __name__ == '__main__':
     
     rseed_code = set(rresstuct.get_res_code(rseed))
     if not rseed_code:
-        msg = 'No rseed={} nucleotides in the {}={} for seed {}'.format(
+        msg = 'No rseed={} nucleotides in the {}={} for r={}'.format(
             rseed,
             ('rres', 'rresneg')[rneg],
             (rres, rresneg)[rneg],
@@ -315,10 +317,11 @@ if  __name__ == '__main__':
     )
     qrres, qures = describe(qresstuct)
     if not qrres:
-        msg = 'No {}={} nucleotides in the {} for seed'.format(
+        msg = 'No {}={} nucleotides in the q={} for qseed={}'.format(
             ('qres', 'qresneg')[qneg],
             (qres, qresneg)[qneg],
-            q
+            q,
+            qseed
         )
         raise Exception(msg)
     else:
@@ -327,7 +330,7 @@ if  __name__ == '__main__':
     
     qseed_code = set(qresstuct.get_res_code(qseed))
     if not qseed_code:
-        msg = 'No qseed={} nucleotides in the {}={} for seed {}'.format(
+        msg = 'No qseed={} nucleotides in the {}={} for q={}'.format(
             qseed,
             ('qres', 'qresneg')[qneg],
             (qres, qresneg)[qneg],
