@@ -3,9 +3,9 @@ import os
 import pandas as pd 
 import numpy  as np
 
-
 pd.to_numeric.__defaults__ = 'ignore', None
 
+formats = {'PDB', 'CIF'}
 
 class Structure:
     count = 0
@@ -16,8 +16,8 @@ class Structure:
             name = 'struct_{}'.format(Structure.count)
         
         self.name = name
-        self.tab  = None # pandas.DataFrame to store the atom_site table
-        self.fmt  = None # str to store the table format [CIF or PDB]
+        self.tab  = None    # DataFrame to store the atom_site table
+        self.fmt  = None    # str to store the table format [CIF or PDB]
     
     def __str__(self) -> 'str':
         return self.name
@@ -44,7 +44,7 @@ class Structure:
         return self.fmt
     
     
-    def one_letter_chain_renaming(tab:'pd.DataFrame'):
+    def _one_letter_chain_renaming(tab:'pd.DataFrame'):
         '''
         When converting from CIF to PDB format, the chain labels are translated into a one-letter code
         '''
@@ -76,12 +76,12 @@ class Structure:
             tab['auth_asym_id'].replace(rnm, inplace=True)
 
             for k, v in sorted(rnm.items(), key=lambda x:x[1]):
-                rmk = REMARK_FORMAT.format(k, v)
+                rmk = REMARK.format(k, v)
                 rmk += ' ' * (80 - len(rmk)) + '\n'
                 msg.append(rmk)
         
         return tab, msg
-
+    
     
     def saveto(self, folder:'str', fmt:'str' = None) -> 'None':
         os.makedirs(folder, exist_ok=True)
@@ -99,7 +99,7 @@ class Structure:
         
         if fmt == 'PDB':
             if self.fmt != fmt:
-                tab, msg = Structure.one_letter_chain_renaming(tab)
+                tab, msg = Structure._one_letter_chain_renaming(tab)
                 tab = tab.replace('.', '')
                 tab.replace('?', '', inplace=True)
             else:
@@ -107,15 +107,15 @@ class Structure:
             
             text = ''.join(msg)
             for model_num, tt in tab.groupby('pdbx_PDB_model_num', sort=False):
-                text += MODEL_FORMAT.format(model_num)
+                text += MODEL.format(model_num)
                 tt['id'] = range(1, len(tt) + 1)
                 chain_count = 0
                 for asym_id, ttt in tt.groupby('auth_asym_id', sort=False):
                     ttt['id'] = (ttt['id'] + chain_count) % 1_000_000
                     for item in ttt.iloc:
-                        text += ATOM_FORMAT.format(**item)
+                        text += ATOM.format(**item)
                     item['id'] += 1
-                    text  += TER_FORMAT.format(**item)
+                    text  += TER.format(**item)
                     chain_count += 1
                 text += ENDMDL
             file.write(text)
@@ -151,12 +151,6 @@ class Structure:
     
     
     def apply_transform(self, transform) -> 'Structure':
-        '''
-        transform = (rot, tran)
-        rot  - rotation matrix with 3x3 shape
-        tran - displacement vector with 1x3 shape
-        '''
-        
         cols  = ['Cartn_x', 'Cartn_y', 'Cartn_z']
         tab   = self.tab.copy()
         
@@ -185,6 +179,8 @@ class Structure:
                     cc = next(gen, False)
                 else:
                     c = cc
+            else:
+                c = next(gen, False)
         
         if spl['#']:
             spl['#'] = int(spl['#'])
@@ -205,21 +201,21 @@ class Structure:
         return spl
     
     
-    def get_res_msk(self, res: 'str') -> 'pd.Series':
+    def get_res_mask(self, res: 'str') -> 'pd.Series':
         tab = self.tab
         spl = Structure._res_split(res)
         
         mod = spl['#']
         if mod:
-            mod_msk = tab['pdbx_PDB_model_num'].eq(mod)
+            mod_mask = tab['pdbx_PDB_model_num'].eq(mod)
         else:
-            mod_msk = tab['pdbx_PDB_model_num'].astype(bool)
+            mod_mask = tab['pdbx_PDB_model_num'].astype(bool)
         
         chn = spl['/']
         if chn:
-            chn_msk = tab['auth_asym_id'].eq(chn)
+            chn_mask = tab['auth_asym_id'].eq(chn)
         else:
-            chn_msk = tab['auth_asym_id'].astype(bool)
+            chn_mask = tab['auth_asym_id'].astype(bool)
         
         rng  = spl[':']
         if rng:
@@ -229,25 +225,25 @@ class Structure:
         
         # res wo ':'
         if case == 0:
-            rng_msk = tab['auth_seq_id'].astype(bool)
+            rng_mask = tab['auth_seq_id'].astype(bool)
        
         # ':N'
         elif case == 1:
             res = rng[0]
             if res:
-                rng_msk = tab['auth_comp_id'].eq(rng[0])
+                rng_mask = tab['auth_comp_id'].eq(rng[0])
             else:
-                rng_msk = tab['auth_comp_id'].astype(bool)
+                rng_mask = tab['auth_comp_id'].astype(bool)
         
         #':_num' | ':_numN' | ':N_num' | ':N1_numN2'
         elif case == 2:
             res, num  = rng
             if type(num) == int:
                 if res:
-                    rng_msk = tab['auth_seq_id'].eq(num) \
+                    rng_mask = tab['auth_seq_id'].eq(num) \
                         & tab['auth_comp_id'].eq(res)
                 else:
-                    rng_msk = tab['auth_seq_id'].eq(num)
+                    rng_mask = tab['auth_seq_id'].eq(num)
             else:
                 # ':N1_numN2' = ':_numN2' even if N1 != N2
                 dgt = ''
@@ -258,23 +254,23 @@ class Structure:
                         break
                 res = num[i:]
                 num = int(dgt)
-                rng_msk = tab['auth_seq_id'].eq(num) \
+                rng_mask = tab['auth_seq_id'].eq(num) \
                     & tab['auth_comp_id'].eq(res)
         
         # ':_num1_num2' | ':N_num1_num2'
         elif case == 3:
             res, num_1, num_2 = rng
             if res:
-                rng_msk = tab['auth_comp_id'].eq(res) \
+                rng_mask = tab['auth_comp_id'].eq(res) \
                     & tab['auth_seq_id'].between(num_1, num_2)
             else:
-                rng_msk = tab['auth_seq_id'].between(num_1, num_2)
+                rng_mask = tab['auth_seq_id'].between(num_1, num_2)
         
         # incorrect res
         else:
-            rng_msk = tab['auth_seq_id'].astype(bool) ^ True
+            rng_mask = tab['auth_seq_id'].astype(bool) ^ True
         
-        msk = mod_msk & chn_msk & rng_msk
+        msk = mod_mask & chn_mask & rng_mask
         
         return msk
     
@@ -288,7 +284,7 @@ class Structure:
         '''
         
         tab = self.tab
-        msk = self.get_res_msk(res)
+        msk = self.get_res_mask(res)
         if neg:
             msk ^=True
         tab = tab[msk]
@@ -300,22 +296,31 @@ class Structure:
         return structure
     
     
-    def add_code_msk(self) -> None:
+    def set_code_mask(self, code_mask = None) -> None:
         tab = self.tab
-        code_msk = tab['pdbx_PDB_model_num'].astype(str)\
-            + '.' + tab['auth_asym_id'].astype(str)\
-            + '.' + tab['auth_comp_id'].astype(str)\
-            + '.' + tab['auth_seq_id'].astype(str)\
-            + '.' + tab['pdbx_PDB_ins_code'].astype(str).replace('?', '')
-        self.code_msk = code_msk
+        if code_mask:
+            self.code_mask = code_mask
+        else:
+            code_mask = tab['pdbx_PDB_model_num'].astype(str)\
+                + '.' + tab['auth_asym_id'].astype(str)\
+                + '.' + tab['auth_comp_id'].astype(str)\
+                + '.' + tab['auth_seq_id'].astype(str)\
+                + '.' + tab['pdbx_PDB_ins_code'].astype(str).replace('?', '')
+            self.code_mask = code_mask
+    
+    
+    def get_code_mask(self) -> 'pd.Series':
+        if not hasattr(self, 'code_mask'):
+            self.set_code_mask()
+        return self.code_mask
     
     
     def get_res_code(self, res:'str' = '', neg:'bool' = False) -> 'list':
         if not hasattr(self, 'code_msk'):
-            self.add_code_msk()
+            self.set_code_mask()
         
-        code_msk = self.code_msk
-        msk = self.get_res_msk(res)
+        code_msk = self.code_mask
+        msk = self.get_res_mask(res)
         if neg:
             msk ^= True
         res_code = code_msk[msk].unique().tolist()
@@ -340,10 +345,10 @@ class Structure:
     
     def artem_desc(self, seed_res_repr):
         if not hasattr(self, 'code_msk'):
-            self.add_code_msk()
+            self.set_code_mask()
         
         tab  = self.tab.set_index('auth_atom_id')
-        code_msk = self.code_msk.set_axis(tab.index)
+        code_msk = self.code_mask.set_axis(tab.index)
         
         rres = []
         ures = []
@@ -408,7 +413,7 @@ def parser(path:'str', fmt:'str' = 'PDB', name:'str' = '') -> 'Structure':
             'type_symbol',
             'pdbx_formal_charge',
             
-            'pdbx_PDB_model_num',
+            'pdbx_PDB_model_num',   # extra column for the atomic coordinate table
         )
         
         rec_names = {'ATOM  ', 'HETATM'}
@@ -444,6 +449,10 @@ def parser(path:'str', fmt:'str' = 'PDB', name:'str' = '') -> 'Structure':
         file.close()
         
         tab = pd.DataFrame(items, columns=columns)
+        if tab.empty:
+            raise Exception(
+                'File {} does not contain {} format data'.format(path, fmt)
+            )
         tab = tab.apply(pd.to_numeric)
         tab.fillna('', inplace=True)
     
@@ -466,6 +475,11 @@ def parser(path:'str', fmt:'str' = 'PDB', name:'str' = '') -> 'Structure':
         tab   = pd.DataFrame(items, columns=columns)
         tab   = tab.apply(pd.to_numeric)
         
+        if tab.empty:
+            raise Exception(
+                'File {} does not contain {} format data'.format(path, fmt)
+            )
+        
         auth  = [
             'auth_asym_id',
             'auth_seq_id',
@@ -482,6 +496,7 @@ def parser(path:'str', fmt:'str' = 'PDB', name:'str' = '') -> 'Structure':
             if a not in tab.columns:
                 tab[a] = tab[l]
         
+        
         l = lambda x: x[1:-1] if x.startswith('"') or x.startswith("'") else x
         tab['label_atom_id'] = list(map(l, tab['label_atom_id']))
         tab['auth_atom_id']  = list(map(l, tab['auth_atom_id']))
@@ -493,8 +508,9 @@ def parser(path:'str', fmt:'str' = 'PDB', name:'str' = '') -> 'Structure':
     return struct
 
 
-ATOM_FORMAT   = '{group_PDB:<6}{id:>5} {auth_atom_id:<4}{label_alt_id:1}{auth_comp_id:>3}{auth_asym_id:>2}{auth_seq_id:>4}{pdbx_PDB_ins_code:1}   {Cartn_x:>8.3f}{Cartn_y:>8.3f}{Cartn_z:>8.3f}{occupancy:>6.2f}{B_iso_or_equiv:>6.2f}          {type_symbol:>2}{pdbx_formal_charge:>2}\n'
-TER_FORMAT    = 'TER   {id:>5}      {auth_comp_id:>3}{auth_asym_id:>2}{auth_seq_id:>4}                                                      \n'
-MODEL_FORMAT  = 'MODEL     {:>4}                                                                  \n'
-ENDMDL        = 'ENDMDL                                                                          \n'
-REMARK_FORMAT = 'REMARK 250 CHAIN RENAMING {} -> {}'
+# PDB save formats
+ATOM   = '{group_PDB:<6}{id:>5} {auth_atom_id:<4}{label_alt_id:1}{auth_comp_id:>3}{auth_asym_id:>2}{auth_seq_id:>4}{pdbx_PDB_ins_code:1}   {Cartn_x:>8.3f}{Cartn_y:>8.3f}{Cartn_z:>8.3f}{occupancy:>6.2f}{B_iso_or_equiv:>6.2f}          {type_symbol:>2}{pdbx_formal_charge:>2}\n'
+TER    = 'TER   {id:>5}      {auth_comp_id:>3}{auth_asym_id:>2}{auth_seq_id:>4}                                                      \n'
+MODEL  = 'MODEL     {:>4}                                                                  \n'
+REMARK = 'REMARK 250 CHAIN RENAMING {} -> {}'
+ENDMDL = 'ENDMDL                                                                          \n'
