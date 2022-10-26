@@ -270,9 +270,9 @@ class Structure:
         else:
             rng_mask = tab['auth_seq_id'].astype(bool) ^ True
         
-        msk = mod_mask & chn_mask & rng_mask
+        mask = mod_mask & chn_mask & rng_mask
         
-        return msk
+        return mask
     
     
     def get_res_substruct(self, res:'str', neg:'bool' = False) -> 'Structure':
@@ -296,30 +296,18 @@ class Structure:
         return structure
     
     
-    def set_code_mask(self, code_mask = None) -> None:
+    def _get_code_mask(self) -> 'pd.Series':
         tab = self.tab
-        if code_mask:
-            self.code_mask = code_mask
-        else:
-            code_mask = tab['pdbx_PDB_model_num'].astype(str)\
-                + '.' + tab['auth_asym_id'].astype(str)\
-                + '.' + tab['auth_comp_id'].astype(str)\
-                + '.' + tab['auth_seq_id'].astype(str)\
-                + '.' + tab['pdbx_PDB_ins_code'].astype(str).replace('?', '')
-            self.code_mask = code_mask
-    
-    
-    def get_code_mask(self) -> 'pd.Series':
-        if not hasattr(self, 'code_mask'):
-            self.set_code_mask()
-        return self.code_mask
+        code_mask = tab['pdbx_PDB_model_num'].astype(str)\
+            + '.' + tab['auth_asym_id'].astype(str)\
+            + '.' + tab['auth_comp_id'].astype(str)\
+            + '.' + tab['auth_seq_id'].astype(str)\
+            + '.' + tab['pdbx_PDB_ins_code'].astype(str).replace('?', '')
+        return code_mask
     
     
     def get_res_code(self, res:'str' = '', neg:'bool' = False) -> 'list':
-        if not hasattr(self, 'code_msk'):
-            self.set_code_mask()
-        
-        code_msk = self.code_mask
+        code_msk = self._get_code_mask()
         msk = self.get_res_mask(res)
         if neg:
             msk ^= True

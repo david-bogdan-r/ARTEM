@@ -119,7 +119,7 @@ def describe(struct: 'pdb.Structure'):
     tab  = struct.get_tab().copy()
     tab.set_index('auth_atom_id', inplace=True)
     
-    code_mask = struct.get_code_mask().set_axis(tab.index)
+    code_mask = struct._get_code_mask().set_axis(tab.index)
     
     data  = []
     noise = []
@@ -228,7 +228,7 @@ if  __name__ == '__main__':
     
     rresneg = kwargs.get('rresneg', rresneg)
     rneg    = bool(rresneg)
-    rseed   = kwargs.get('rseed', (rres, rresneg)[rneg])
+    rseed   = kwargs.get('rseed', '#')
     
     rformat = kwargs.get('rformat', None)
     rname, rext = r.split(os.sep)[-1].split('.')
@@ -242,10 +242,10 @@ if  __name__ == '__main__':
         rformat = rformat.upper()
     
     q       = kwargs.get('q')
-    qres    = kwargs.get('qres',    qres)
+    qres    = kwargs.get('qres', qres)
     qresneg = kwargs.get('qresneg', qresneg)
     qneg    = bool(qresneg)
-    qseed   = kwargs.get('qseed', (qres, qresneg)[qneg])
+    qseed   = kwargs.get('qseed', '#')
     qformat = kwargs.get('qformat', None)
     qname, qext = q.split(os.sep)[-1].split('.')
     qext = qext.upper()
@@ -274,11 +274,12 @@ if  __name__ == '__main__':
     rstruct  = pdb.parser(r, rformat, rname)
     rstruct.drop_duplicates_alt_id(keep=keep)
     
-    rresstuct = rstruct.get_res_substruct(
+    rresstruct = rstruct.get_res_substruct(
         (rres, rresneg)[rneg],
         rneg
     )
-    rdata, rnoise = describe(rresstuct)
+    
+    rdata, rnoise = describe(rresstruct)
     if not rdata:
         msg = 'No {}={} nucleotides in the r={} for rseed={}'.format(
             ('rres', 'rresneg')[rneg],
@@ -291,7 +292,7 @@ if  __name__ == '__main__':
         r_code, r_prim, r_avg, r_scnd, r_eval = zip(*rdata)
         r_avg = np.vstack(r_avg)
     
-    rseed_code = set(rresstuct.get_res_code(rseed))
+    rseed_code = set(rstruct.get_res_code(rseed))
     if not rseed_code:
         msg = 'No rseed={} nucleotides in the {}={} for r={}'.format(
             rseed,
@@ -311,11 +312,11 @@ if  __name__ == '__main__':
     qstruct.drop_duplicates_alt_id(keep=keep)
     
     qneg = bool(qresneg)
-    qresstuct = qstruct.get_res_substruct(
+    qresstruct = qstruct.get_res_substruct(
         (qres, qresneg)[qneg],
         qneg
     )
-    qrres, qures = describe(qresstuct)
+    qrres, qures = describe(qresstruct)
     if not qrres:
         msg = 'No {}={} nucleotides in the q={} for qseed={}'.format(
             ('qres', 'qresneg')[qneg],
@@ -328,7 +329,7 @@ if  __name__ == '__main__':
         q_code, q_prim, q_avg, q_scnd, q_eval = zip(*qrres)
         q_avg = np.vstack(q_avg)
     
-    qseed_code = set(qresstuct.get_res_code(qseed))
+    qseed_code = set(qstruct.get_res_code(qseed))
     if not qseed_code:
         msg = 'No qseed={} nucleotides in the {}={} for q={}'.format(
             qseed,
@@ -363,7 +364,7 @@ if  __name__ == '__main__':
         if saveres:
             sstruct = qstruct.get_res_substruct(saveres)
         else:
-            sstruct = qresstuct
+            sstruct = qresstruct
     
     
     # ARTEM Computations 
