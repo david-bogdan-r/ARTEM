@@ -196,9 +196,48 @@ def artem(m, n):
 def save_superimpose(superimpose:'pd.Series') -> 'None':
     neighbors = superimpose['neighbors']
     X, Y = vstack([[r_scnd[i], q_scnd[j]] for i, j in neighbors])
-    scnd_transform = get_transform(X, Y)
-    struct = sstruct.apply_transform(scnd_transform)
-    struct.rename('{}_{}'.format(sstruct, superimpose.name))
+    rot, tran = get_transform(X, Y)
+    
+    coord_cols = ['Cartn_x', 'Cartn_y', 'Cartn_z']
+    
+    tab_1 = qstruct.tab[ssmask]
+    tab_1.loc[:, coord_cols] = np.round(
+        np.dot(tab_1[coord_cols], rot) + tran, 
+        3
+    )
+    max_models = tab_1['pdbx_PDB_model_num'].max()
+    
+    rsavecode, qsavecode = zip(*neighbors)
+    
+    rsavecode = [r_code[i] for i in rsavecode]
+    rmask = rstruct._get_code_mask().isin(rsavecode)
+    tab_2 = rstruct.tab[rmask]
+    tab_2['pdbx_PDB_model_num'] = max_models + 1
+    
+    qsavecode = [q_code[i] for i in qsavecode]
+    qmask = qstruct._get_code_mask().isin(qsavecode)
+    tab_3 = qstruct.tab[qmask]
+    tab_3.loc[:, coord_cols] = np.round(
+        np.dot(tab_3[coord_cols], rot) + tran, 
+        3
+    )
+    tab_3['pdbx_PDB_model_num'] = max_models + 2
+    
+    struct = pdb.Structure('{}_{}'.format(qstruct, superimpose.name))
+    used_cols = min([tab_1.columns, tab_2.columns], key=len)
+    tab = pd.concat([tab_1[used_cols], tab_2[used_cols], tab_3[used_cols]])
+    
+    if rstruct.fmt != qstruct.fmt:
+        tab['label_alt_id'].replace('.', '', inplace=True)
+        tab['pdbx_PDB_ins_code'].replace('?', '', inplace=True)
+        tab['pdbx_formal_charge'].replace('?', '', inplace=True)
+        
+        struct.set_tab(tab)
+        struct.set_fmt('PDB')
+    else:
+        struct.set_tab(tab)
+        struct.set_fmt(qstruct.fmt)
+    
     struct.saveto(saveto, saveformat)
 
 
@@ -351,7 +390,7 @@ if  __name__ == '__main__':
         os.makedirs(saveto, exist_ok=True)
         saveres    = kwargs.get('saveres', saveres)
         saveformat = kwargs.get('saveformat', qformat).upper()
-    
+        
         if saveformat not in pdb.formats:
             if saveformat == 'MMCIF':
                 saveformat = 'CIF'
@@ -361,49 +400,63 @@ if  __name__ == '__main__':
                 raise TypeError(msg)
         
         if saveres:
-            sstruct = qstruct.get_res_substruct(saveres)
+            ssmask = qstruct.get_res_mask(saveres)
         else:
-            sstruct = qresstruct
+            ssmask = qresstruct.tab['id'].astype(bool)
     
     
     # ARTEM Computations 
-    
+    rows = {}
     indx_pairs = list(itertools.product(r_ind, q_ind))
     r_avg_tree = KDTree(r_avg)
     if threads == 1:
-        result = [artem(m, n) for m, n in indx_pairs]
+        i = 0 
+        for rslt in (artem(m, n) for m, n in indx_pairs):
+            if rslt:
+                nb, rmsd = rslt
+            else:
+                i += 1
+                continue
+            
+            if nb in rows:
+                row = rows[nb]
+                if rmsd < row[0]:
+                    row[0] = rmsd
+                    row.insert(1, i)
+                else:
+                    row.append(i)
+            else:
+                rows[nb] = [rmsd, i]
+            i += 1 
     else:
         pool = mp.Pool(threads)
         
         delta   = 15 * threads
         cnt     = 0
         cnt_max = len(indx_pairs)
-        result  = []
         while cnt < cnt_max:
-            result.extend(
-                pool.starmap(artem, indx_pairs[cnt:cnt + delta])
-            )
+            i = cnt 
+            for rslt in pool.starmap(artem, indx_pairs[cnt:cnt + delta]):
+                if rslt:
+                    nb, rmsd = rslt
+                else:
+                    i += 1
+                    continue
+                
+                if nb in rows:
+                    row = rows[nb]
+                    if rmsd < row[0]:
+                        row[0] = rmsd
+                        row.insert(1, i)
+                    else:
+                        row.append(i)
+                else:
+                    rows[nb] = [rmsd, i]
+                i += 1 
             cnt += delta
+    rows = [[i, *v] for i, v in rows.items()]
     
     # Output
-    
-    rows = {}
-    for i, rslt in enumerate(result):
-        if rslt:
-            nb, rmsd = rslt
-        else:
-            continue
-        
-        if nb in rows:
-            row = rows[nb]
-            if rmsd < row[0]:
-                row[0] = rmsd
-                row.insert(1, i)
-            else:
-                row.append(i)
-        else:
-            rows[nb] = [rmsd, i]
-    rows = [[i, *v] for i, v in rows.items()]
     
     tabrows = []
     if sizemin <= 0:
@@ -452,10 +505,10 @@ if  __name__ == '__main__':
         sep='\t',
         float_format='{:0.3f}'.format,
     )
-    
+     
     if saveto:
         if 'pool' in dir():
-            pool.map(save_superimpose, tab.iloc)
+            pool.map(save_superimpose, tab[tab['SIZE'] > 0].iloc)
         else:
-            for superimpose in tab.iloc:
+            for superimpose in tab[tab['SIZE'] > 0].iloc:
                 save_superimpose(superimpose)
