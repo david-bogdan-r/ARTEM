@@ -1,156 +1,189 @@
 import os
-import gc
 import sys
 import itertools
-import psutil
-import time
 
 import pandas as pd
 import numpy  as np
 import multiprocessing as mp
 
 from scipy.spatial import KDTree
-from shutil import rmtree
 from lib import nar
 from lib import pdb
 
+import psutil
+import time
 
 # ignore SettingWithCopyWarning
 pd.set_option('mode.chained_assignment', None)
 
 
+# Defaults
+
 rres    = ''
 qres    = ''
 rresneg = ''
 qresneg = ''
-rseed   = ''
-qseed   = ''
-
-rformat = 'PDB'
-qformat = 'PDB'
 
 rmsdmin     = 0.
 rmsdmax     = 1e10
-sizemin     = 0.
+sizemin     = 1.
 sizemax     = 1e10
 rmsdsizemin = 0.
 rmsdsizemax = 1e10
 matchrange  = 3.
 
-saveto     = ''
-saveres    = ''
+saveto  = ''
+saveres = ''
 
 threads = 1
 
 seed_res_repr = (
-    # For primary alignment
-    nar.five_atom_repr,
-    
-    # To calculate centers of mass
-    nar.five_atom_repr,
-    
-    # For secondary alignment
-    nar.three_atom_repr,
-    
-    # To calculate the RMSD
-    nar.three_atom_repr,
+    nar.five_atom_repr,     # For primary alignment
+    nar.five_atom_repr,     # To calculate centers of mass
+    nar.three_atom_repr,    # For secondary alignment
+    nar.three_atom_repr,    # To calculate the RMSD
 )
 seed_res_repr = nar.join_res_repr(seed_res_repr)
 
-# Keep alternative atom locations: 'first', 'last', False
-keep = 'last'
 
-def get_transform(r:'np.ndarray', q:'np.ndarray'):
-    r_avg = r.mean(axis=0)
-    q_avg = q.mean(axis=0)
-    
-    r = r - r_avg
-    q = q - q_avg
-    
-    M = np.dot(np.transpose(q), r)
-    u, s, vh = np.linalg.svd(M)
-    
-    rot = np.transpose(np.dot(np.transpose(vh), np.transpose(u)))
-    if np.linalg.det(rot) < 0:
-        vh[2] = -vh[2]
-        rot = np.transpose(np.dot(np.transpose(vh), np.transpose(u)))
-    tran = r_avg - np.dot(q_avg, rot)
-    
-    return rot, tran
+keep = 'last'   # keep alternative atom locations: 'first', 'last', False
 
 
-def RMSD(r:'np.ndarray', q:'np.ndarray') -> 'float':
-    diff = r - q
-    return np.sqrt(np.sum(np.sum(np.multiply(diff, diff))) / len(r))
+# Functions
 
-
-def apply_transform(coord:'np.ndarray', rotran):
-    rot, tran = rotran
-    return np.dot(coord, rot) + tran
-
-
-def mutual_nb(dist:'list') -> 'list':
+def get_transform(X:'np.ndarray', Y:'np.ndarray'):
     '''
+    Returns a linear operator minimizing the RMSD between matrix q and r.
+    
     Input:
-    dist - list of threes [rres_intID, qres_intID, distance]
-    
+        r - N x 3 np.ndarray matrix
+        q - N x 3 np.ndarray matrix
     Output:
-    alt - list of pairs of mutually nearest residues (rres_intID, qres_intID)
+        rot  - 3 x 3 rotation np.ndarray matrix
+        tran - 3 - np.ndarray vector 
     '''
-    U_1 = {}
-    U_2 = {}
+    X_avg = X.mean(axis=0)
+    Y_avg = Y.mean(axis=0)
     
-    for e in dist:
-        v_1, v_2, d = e
-        if v_1 not in U_1:
-            U_1[v_1] = v_2, d
+    X = X - X_avg
+    Y = Y - Y_avg
+    
+    M = np.dot(np.transpose(Y), X)
+    S, V, D = np.linalg.svd(M)
+    
+    A = np.transpose(np.dot(np.transpose(D), np.transpose(S)))
+    if np.linalg.det(A) < 0:
+        D[2] = -D[2]
+        A = np.transpose(np.dot(np.transpose(D), np.transpose(S)))
+    B = X_avg - np.dot(Y_avg, A)
+    
+    return A, B
+
+def apply_transform(X:'np.ndarray', transform):
+    A, B = transform
+    return np.dot(X, A) + B
+
+def RMSD(X:'np.ndarray', Y:'np.ndarray') -> 'float':
+    dX = X - Y
+    return np.sqrt(np.sum(np.sum(np.multiply(dX, dX))) / len(X))
+
+def mutual_nearest_neighbors(distances:'list') -> 'list':
+    neighbor_1 = {}
+    neighbor_2 = {}
+    for edge in distances:
+        vert_1, vert_2, dist = edge
+        if vert_1 not in neighbor_1:
+            neighbor_1[vert_1] = vert_2, dist
         else:
-            if d < U_1[v_1][1]:
-                U_1[v_1] = v_2, d
+            if dist < neighbor_1[vert_1][1]:
+                neighbor_1[vert_1] = vert_2, dist
         
-        if v_2 not in U_2:
-            U_2[v_2] = v_1, d
+        if vert_2 not in neighbor_2:
+            neighbor_2[vert_2] = vert_1, dist
         else:
-            if d < U_2[v_2][1]:
-                U_2[v_2] = v_1, d
+            if dist < neighbor_2[vert_2][1]:
+                neighbor_2[vert_2] = vert_1, dist
     
-    alt = []
-    for v_2 in U_2:
-        v_1, d = U_2[v_2]
-        if U_1[v_1][0] == v_2:
-            alt.append((v_1, v_2))
+    neighbors = []
+    for vert_2 in neighbor_2:
+        vert_1, dist = neighbor_2[vert_2]
+        if neighbor_1[vert_1][0] == vert_2:
+            neighbors.append((vert_1, vert_2))
+    return neighbors
+
+
+def vstack(ndarray_pairs):
+    X, Y = zip(*ndarray_pairs)
+    return np.vstack(X), np.vstack(Y)
+
+def describe(struct: 'pdb.Structure'):
+    tab  = struct.get_tab().copy()
+    tab.set_index('auth_atom_id', inplace=True)
     
-    return alt
-
-
-def vstack(alt):
-    ref_coord, alg_coord = zip(*alt)
-    return np.vstack(ref_coord), np.vstack(alg_coord)
-
-
-def task(m, n):
-    transform  = get_transform(r_prim[m], q_prim[n])
+    code_mask = struct._get_code_mask().set_axis(tab.index)
     
-    q_avg_tree = KDTree(apply_transform(q_avg, transform))
+    data  = []
+    noise = []
+    cartn_cols = ['Cartn_x', 'Cartn_y', 'Cartn_z']
+    for code, res_tab in tab[cartn_cols].groupby(code_mask, sort=False):
+        res_id = code.split('.', 3)[-2]
+        if res_id not in seed_res_repr.keys():
+            noise.append(code)
+            continue
+        
+        flg = False
+        res_data = []
+        for res_repr in seed_res_repr[res_id]:
+            res_cartn = []
+            for atom_repr in res_repr:
+                try:
+                    atom_cartn = res_tab.loc[atom_repr].values
+                except:
+                    noise.append(code)
+                    flg = True
+                    break
+                
+                if len(atom_cartn) > 1:
+                    atom_cartn = atom_cartn.mean(axis=0)
+                
+                res_cartn.append(atom_cartn)
+            
+            if flg:
+                break
+            
+            res_cartn = np.vstack(res_cartn)
+            res_data.append(res_cartn)
+        
+        if flg:
+            continue
+        
+        res_data[1] = res_data[1].mean(axis=0)
+        data.append([code, *res_data])
+    
+    return data, noise
+
+def artem(m, n):
+    prim_transform  = get_transform(r_prim[m], q_prim[n])
+    
+    q_avg_tree = KDTree(apply_transform(q_avg, prim_transform))
     dist = r_avg_tree.sparse_distance_matrix(
         q_avg_tree,
         matchrange,
         p=2,
         output_type='ndarray'
     )
-    
-    nb   = mutual_nb(dist)
-    size = len(nb)
+
+    neighbors = mutual_nearest_neighbors(dist)
+    size = len(neighbors)
     if not sizemin <= size <= sizemax:
         return None
     
-    scnd = vstack([[r_scnd[i], q_scnd[j]] for i, j in nb])
-    transform  = get_transform(*scnd)
+    X, Y = vstack([[r_scnd[i], q_scnd[j]] for i, j in neighbors])
+    scnd_transform = get_transform(X, Y)
     
-    r_coord, q_coord = vstack([[r_eval[i], q_eval[j]] for i, j in nb])
-    q_coord = apply_transform(q_coord, transform)
+    X, Y = vstack([[r_eval[i], q_eval[j]] for i, j in neighbors])
     
-    rmsd = RMSD(r_coord, q_coord)
+    rmsd = RMSD(X, apply_transform(Y, scnd_transform))
     if not rmsdmin <= rmsd <= rmsdmax:
         return None
     
@@ -158,48 +191,72 @@ def task(m, n):
     if not rmsdsizemin <= rmsdsize <= rmsdsizemax:
         return None
     
-    if saveto:
-        sup_sstract = sstruct.apply_transform(transform)
-        sup_sstract.rename('{}_{}_{}'.format(sup_sstract, m, n))
-        sup_sstract.saveto('tmp', saveformat)
-    
-    nb = tuple(sorted(nb))
-    return (nb, rmsd)
+    neighbors = tuple(sorted(neighbors))
+    return (neighbors, rmsd)
 
+
+def save_superimpose(superimpose:'pd.Series') -> 'None':
+    neighbors = superimpose['neighbors']
+    X, Y = vstack([[r_scnd[i], q_scnd[j]] for i, j in neighbors])
+    scnd_transform = get_transform(X, Y)
+    struct = sstruct.apply_transform(scnd_transform)
+    struct.rename('{}_{}'.format(sstruct, superimpose.name))
+    struct.saveto(saveto, saveformat)
 
 
 if  __name__ == '__main__':
-    # Processing inputs
-    argv = sys.argv[1:]
     
+    # Processing inputs
+    
+    argv = sys.argv[1:]
     if argv[0] in {'--H', '-H', '--h', '-h', '--help', '-help'}:
-        with open('help.txt', 'r') as help:
-            print(*help)
-        exit(0)
+        with open('README.md', 'r') as rdme:
+            print(*rdme)
+        exit()
     else:
         kwargs = dict([arg.split('=') for arg in argv])
     
     threads = int(kwargs.get('threads', threads))
     if threads != 1:
-        # Multiprocessing is available only for UNIX-like systems
-        mp.set_start_method('fork')
-        
-        if threads < 0:
+        mp.set_start_method('fork')     # ARTEM multiprocessing is available only for UNIX-like systems
+        if threads <= 0:
             threads = mp.cpu_count()
         else:
             threads = min(threads, mp.cpu_count())
     
     r       = kwargs.get('r')
     rres    = kwargs.get('rres', rres)
+    
     rresneg = kwargs.get('rresneg', rresneg)
-    rseed   = kwargs.get('rseed', rseed)
-    rformat = kwargs.get('rformat', rformat)
+    rneg    = bool(rresneg)
+    rseed   = kwargs.get('rseed', '#')
+    
+    rformat = kwargs.get('rformat', None)
+    rname, rext = r.split(os.sep)[-1].split('.')
+    rext = rext.upper()
+    if not rformat:
+        if rext in pdb.formats:
+            rformat = rext
+        else:
+            rformat = 'PDB'
+    else:
+        rformat = rformat.upper()
     
     q       = kwargs.get('q')
     qres    = kwargs.get('qres', qres)
     qresneg = kwargs.get('qresneg', qresneg)
-    qseed   = kwargs.get('qseed', qseed)
-    qformat = kwargs.get('qformat', qformat)
+    qneg    = bool(qresneg)
+    qseed   = kwargs.get('qseed', '#')
+    qformat = kwargs.get('qformat', None)
+    qname, qext = q.split(os.sep)[-1].split('.')
+    qext = qext.upper()
+    if not qformat:
+        if qext in pdb.formats:
+            qformat = qext
+        else:
+            qformat = 'PDB'
+    else:
+        qformat = qformat.upper()
     
     sizemin     = float(kwargs.get('sizemin', sizemin))
     sizemax     = float(kwargs.get('sizemax', sizemax))
@@ -213,82 +270,79 @@ if  __name__ == '__main__':
     matchrange  = float(kwargs.get('matchrange', matchrange))
     
     
-    rname, rext = r.split(os.sep)[-1].split('.')
-    qname, qext = q.split(os.sep)[-1].split('.')
-    
-    available_format = {'PDB', 'CIF'}
-    
-    rext = rext.upper()
-    if rext in available_format:
-        rformat = rext
-    
-    qext = qext.upper()
-    if qext in available_format:
-        qformat = qext
-    
-    
     # Model preprocessing
     
     rstruct  = pdb.parser(r, rformat, rname)
     rstruct.drop_duplicates_alt_id(keep=keep)
-    rnegcase = bool(rresneg)
-    rsstruct = rstruct.get_res_substruct(
-        [rres, rresneg][rnegcase],
-        rnegcase
+    
+    rresstruct = rstruct.get_res_substruct(
+        (rres, rresneg)[rneg],
+        rneg
     )
-    rrres, rures = rsstruct.artem_desc(seed_res_repr)
-    if not rrres:
-        msg = 'No {}={} nucleotides in the {} for seed'.format(
-            ['rres', 'rresneg'][rnegcase],
-            [rres, rresneg][rnegcase],
-            r
+    
+    rdata, rnoise = describe(rresstruct)
+    if not rdata:
+        msg = 'No {}={} nucleotides in the r={} for rseed={}'.format(
+            ('rres', 'rresneg')[rneg],
+            (rres, rresneg)[rneg],
+            r,
+            rseed
         )
-        raise ValueError(msg)
-    rseed_code = rsstruct.get_res_code(rseed)
+        raise Exception(msg)
+    else:
+        r_code, r_prim, r_avg, r_scnd, r_eval = zip(*rdata)
+        r_avg = np.vstack(r_avg)
+    
+    rseed_code = set(rstruct.get_res_code(rseed))
     if not rseed_code:
-        msg = 'No rseed={} nucleotides in the {}={} for seed {}'.format(
+        msg = 'No rseed={} nucleotides in the {}={} for r={}'.format(
             rseed,
-            ['rres', 'rresneg'][rnegcase],
-            [rres, rresneg][rnegcase],
+            ('rres', 'rresneg')[rneg],
+            (rres, rresneg)[rneg],
             r
         )
-        raise ValueError(msg)
+        raise Exception(msg)
+    else:
+        rseed_npc  = set(rnoise) & rseed_code
+        rseed_code = set(r_code) & rseed_code
     
-    
-    r_code, r_prim, r_avg, r_scnd, r_eval = zip(*rrres)
-    r_avg = np.vstack(r_avg)
-    rseed_code = set(r_code) & set(rseed_code)
     r_ind = [i for i, code in enumerate(r_code) if code in rseed_code]
     
     
     qstruct  = pdb.parser(q, qformat, qname)
     qstruct.drop_duplicates_alt_id(keep=keep)
-    qnegcase = bool(qresneg)
-    qsstruct = qstruct.get_res_substruct(
-        [qres, qresneg][qnegcase],
-        qnegcase
-    )
-    qrres, qures = qsstruct.artem_desc(seed_res_repr)
-    if not qrres:
-        msg = 'No {}={} nucleotides in the {} for seed'.format(
-            ['qres', 'qresneg'][qnegcase],
-            [qres, qresneg][qnegcase],
-            q
-        )
-        raise ValueError(msg)
-    qseed_code = qsstruct.get_res_code(qseed)
-    if not qseed_code:
-        msg = 'No qseed={} nucleotides in the {}={} for seed {}'.format(
-            qseed,
-            ['qres', 'qresneg'][qnegcase],
-            [qres, qresneg][qnegcase],
-            q
-        )
-        raise ValueError(msg)
     
-    q_code, q_prim, q_avg, q_scnd, q_eval = zip(*qrres)
-    q_avg = np.vstack(q_avg)
-    qseed_code = set(q_code) & set(qseed_code)
+    qneg = bool(qresneg)
+    qresstruct = qstruct.get_res_substruct(
+        (qres, qresneg)[qneg],
+        qneg
+    )
+    qrres, qures = describe(qresstruct)
+    if not qrres:
+        msg = 'No {}={} nucleotides in the q={} for qseed={}'.format(
+            ('qres', 'qresneg')[qneg],
+            (qres, qresneg)[qneg],
+            q,
+            qseed
+        )
+        raise Exception(msg)
+    else:
+        q_code, q_prim, q_avg, q_scnd, q_eval = zip(*qrres)
+        q_avg = np.vstack(q_avg)
+    
+    qseed_code = set(qstruct.get_res_code(qseed))
+    if not qseed_code:
+        msg = 'No qseed={} nucleotides in the {}={} for q={}'.format(
+            qseed,
+            ('qres', 'qresneg')[qneg],
+            (qres, qresneg)[qneg],
+            q
+        )
+        raise Exception(msg)
+    else:
+        qseed_npc  = set(qures)  & qseed_code
+        qseed_code = set(q_code) & qseed_code
+    
     q_ind = [i for i, code in enumerate(q_code) if code in qseed_code]
     q_count = len(q_code)
     
@@ -300,21 +354,18 @@ if  __name__ == '__main__':
         saveres    = kwargs.get('saveres', saveres)
         saveformat = kwargs.get('saveformat', qformat).upper()
     
-        if saveformat not in available_format:
+        if saveformat not in pdb.formats:
             if saveformat == 'MMCIF':
                 saveformat = 'CIF'
             else:
-                msg = 'Invalid saveformat value. Acceptable values for saveformat'
-                msg+= 'are PDB, CIF or MMCIF (case-insensitive)'
+                msg = '''Invalid saveformat value
+                \rAcceptable values for saveformat are PDB, CIF or MMCIF'''
                 raise TypeError(msg)
         
         if saveres:
             sstruct = qstruct.get_res_substruct(saveres)
         else:
-            sstruct = qsstruct
-        
-        tmp_path = 'tmp/'    + sstruct.name + '_{}_{}.' + saveformat.lower()
-        svt_path = saveto + '/' + sstruct.name + '_{}.' + saveformat.lower()
+            sstruct = qresstruct
     
     
     # ARTEM Computations 
@@ -322,7 +373,7 @@ if  __name__ == '__main__':
     indx_pairs = list(itertools.product(r_ind, q_ind))
     r_avg_tree = KDTree(r_avg)
     if threads == 1:
-        result = [task(m, n) for m, n in indx_pairs]
+        result = [artem(m, n) for m, n in indx_pairs]
     else:
         pool = mp.Pool(threads)
         
@@ -332,12 +383,9 @@ if  __name__ == '__main__':
         result  = []
         while cnt < cnt_max:
             result.extend(
-                pool.starmap(task, indx_pairs[cnt:cnt + delta])
+                pool.starmap(artem, indx_pairs[cnt:cnt + delta])
             )
             cnt += delta
-            gc.collect()
-            print(cnt, round(cnt / len(indx_pairs), 3), psutil.Process().memory_info().rss, time.time())
-        else:
             print(cnt, round(cnt / len(indx_pairs), 3), psutil.Process().memory_info().rss, time.time())
     
     # Output
@@ -361,12 +409,17 @@ if  __name__ == '__main__':
     rows = [[i, *v] for i, v in rows.items()]
     
     tabrows = []
+    if sizemin <= 0:
+        for pair in itertools.product(rseed_npc, qseed_npc | qseed_code):
+            tabrows.append((None, 0, None, None, '='.join(pair), None))
+        for pair in itertools.product(rseed_npc | rseed_code, qseed_npc):
+            tabrows.append((None, 0, None, None, '='.join(pair), None))
+        
     for i, row in enumerate(rows):
         nb   = row[0]
-        rmsd = row[1]
         size = len(nb)
+        rmsd = row[1]
         rmsdsize = rmsd / size
-        file_id  = row[2]
         seed_id  = row[2:]
         
         prim = ','.join(
@@ -383,10 +436,10 @@ if  __name__ == '__main__':
             ]
         )
         
-        tabrows.append((file_id, size, rmsd, rmsdsize, prim, scnd))
+        tabrows.append((nb, size, rmsd, rmsdsize, prim, scnd))
     
     
-    columns = ['ID', 'SIZE', 'RMSD', 'RMSDSIZE', 'PRIM', 'SCND']
+    columns = ['neighbors', 'SIZE', 'RMSD', 'RMSDSIZE', 'PRIM', 'SCND']
     tab = pd.DataFrame(tabrows, columns=columns)
     tab.sort_values(
         ['SIZE', 'RMSDSIZE'], 
@@ -395,12 +448,6 @@ if  __name__ == '__main__':
     )
     tab.index = list(range(1, len(tab) + 1))
     tab.index.name = 'ID'
-    rnm = dict(zip(tab['ID'], tab.index))
-    
-    if saveto:
-        for k, v in list(rnm.items()):
-            os.rename(tmp_path.format(*indx_pairs[k]), svt_path.format(v))
-        rmtree('tmp')
     
     # tab.to_csv(
     #     sys.stdout,
@@ -408,3 +455,10 @@ if  __name__ == '__main__':
     #     sep='\t',
     #     float_format='{:0.3f}'.format,
     # )
+    
+    if saveto:
+        if 'pool' in dir():
+            pool.map(save_superimpose, tab.iloc)
+        else:
+            for superimpose in tab.iloc:
+                save_superimpose(superimpose)

@@ -7,7 +7,6 @@ import numpy  as np
 import multiprocessing as mp
 
 from scipy.spatial import KDTree
-from shutil import rmtree
 from lib import nar
 from lib import pdb
 

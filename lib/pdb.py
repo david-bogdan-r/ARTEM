@@ -411,6 +411,11 @@ def parser(path:'str', fmt:'str' = 'PDB', name:'str' = '') -> 'Structure':
         
         file = open(path, 'r')
         for line in file:
+            if line.startswith('_'):
+                raise Exception(
+                    'File {} does not contain {} format data'.format(path, fmt)
+                )
+            
             rec = line[0:6]
             if rec in rec_names:
                 item = [
@@ -437,10 +442,6 @@ def parser(path:'str', fmt:'str' = 'PDB', name:'str' = '') -> 'Structure':
         file.close()
         
         tab = pd.DataFrame(items, columns=columns)
-        if tab.empty:
-            raise Exception(
-                'File {} does not contain {} format data'.format(path, fmt)
-            )
         tab = tab.apply(pd.to_numeric)
         tab.fillna('', inplace=True)
     
@@ -449,8 +450,14 @@ def parser(path:'str', fmt:'str' = 'PDB', name:'str' = '') -> 'Structure':
             text = file.read()
         
         start = text.find('_atom_site.')
+        if start == -1:
+            raise Exception(
+                'File {} does not contain {} format data'.format(path, fmt)
+            )
+        
         end   = text.find('#', start) - 1
         tab   = text[start:end].split('\n')
+        
         
         columns = []
         for i, line in enumerate(tab):
@@ -462,11 +469,6 @@ def parser(path:'str', fmt:'str' = 'PDB', name:'str' = '') -> 'Structure':
         items = map(str.split, tab[i:])
         tab   = pd.DataFrame(items, columns=columns)
         tab   = tab.apply(pd.to_numeric)
-        
-        if tab.empty:
-            raise Exception(
-                'File {} does not contain {} format data'.format(path, fmt)
-            )
         
         auth  = [
             'auth_asym_id',
