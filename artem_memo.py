@@ -13,6 +13,7 @@ from lib import pdb
 import psutil
 import time
 
+
 # ignore SettingWithCopyWarning
 pd.set_option('mode.chained_assignment', None)
 
@@ -191,12 +192,15 @@ def artem(m, n):
     if not rmsdsizemin <= rmsdsize <= rmsdsizemax:
         return None
     
-    neighbors = tuple(sorted(neighbors))
-    return (neighbors, rmsd)
+    
+    neighbors = sorted([i*q_count + j for i, j in neighbors])
+    neighbors.append(round(rmsd, 3))
+    return tuple(neighbors)
 
 
 def save_superimpose(superimpose:'pd.Series') -> 'None':
     neighbors = superimpose['neighbors']
+    neighbors = [(v // q_count, v % q_count) for v in neighbors]
     X, Y = vstack([[r_scnd[i], q_scnd[j]] for i, j in neighbors])
     rot, tran = get_transform(X, Y)
     
@@ -408,92 +412,71 @@ if  __name__ == '__main__':
     
     
     # ARTEM Computations 
-    rows = {}
+    
+    timestart = time.time()
+    result = {}
     indx_pairs = list(itertools.product(r_ind, q_ind))
     r_avg_tree = KDTree(r_avg)
     if threads == 1:
         i = 0 
-        for rslt in (artem(m, n) for m, n in indx_pairs):
-            if rslt:
-                nb, rmsd = rslt
-            else:
-                i += 1
-                continue
-            
-            if nb in rows:
-                row = rows[nb]
-                if rmsd < row[0]:
-                    row[0] = rmsd
-                    row.insert(1, i)
+        for out in (artem(m, n) for m, n in indx_pairs):
+            if out:
+                if out in result:
+                    result[out].append(i)
                 else:
-                    row.append(i)
-            else:
-                rows[nb] = [rmsd, i]
-            i += 1 
+                    result[out] = [i]
+            i += 1
     else:
         pool = mp.Pool(threads)
-        
-        togb = 1024**3
-        timestart = time.time()
         
         delta   = 15 * threads
         cnt     = 0
         cnt_max = len(indx_pairs)
         while cnt < cnt_max:
             i = cnt 
-            for rslt in pool.starmap(artem, indx_pairs[cnt:cnt + delta]):
-                if rslt:
-                    nb, rmsd = rslt
-                else:
-                    i += 1
-                    continue
-                
-                if nb in rows:
-                    row = rows[nb]
-                    if rmsd < row[0]:
-                        row[0] = rmsd
-                        row.insert(1, i)
+            for out in pool.starmap(artem, indx_pairs[cnt:cnt + delta]):
+                if out:
+                    if out in result:
+                        result[out].append(i)
                     else:
-                        row.append(i)
-                else:
-                    rows[nb] = [rmsd, i]
-                i += 1 
+                        result[out] = [i]
+                i += 1
             cnt += delta
-            print(cnt, round(cnt / len(indx_pairs), 3), round(psutil.Process(os.getpid()).memory_info().rss / togb, 3), int(time.time() - timestart))
-    rows = [[i, *v] for i, v in rows.items()]
+            print(cnt, round(cnt / len(indx_pairs), 3), round(psutil.virtual_memory()[3]/1_000_000_000, 3), int(time.time() - timestart))
+    
+    items = iter(result.items())
+    del result
     
     # Output
     
     tabrows = []
+    
     if sizemin <= 0:
         for pair in itertools.product(rseed_npc, qseed_npc | qseed_code):
             tabrows.append((None, 0, None, None, '='.join(pair), None))
         for pair in itertools.product(rseed_npc | rseed_code, qseed_npc):
             tabrows.append((None, 0, None, None, '='.join(pair), None))
-        
-    for i, row in enumerate(rows):
-        nb   = row[0]
-        size = len(nb)
-        rmsd = row[1]
+    
+    for k, v in items:
+        size = len(k) - 1
+        rmsd = k[-1]
         rmsdsize = rmsd / size
-        seed_id  = row[2:]
-        
+
         prim = ','.join(
             [
                 '='.join([r_code[s // q_count], q_code[s % q_count]])
-                for s in seed_id
+                for s in v
             ]
         )
-        
         scnd = ','.join(
             [
-                '='.join([r_code[m], q_code[n]])
-                for m, n in nb
+                '='.join([r_code[s // q_count], q_code[s % q_count]])
+                for s in k[:-1]
             ]
         )
         
-        tabrows.append((nb, size, rmsd, rmsdsize, prim, scnd))
-    
+        tabrows.append((k[:-1], size, rmsd, rmsdsize, prim, scnd))
+    del items
     
     columns = ['neighbors', 'SIZE', 'RMSD', 'RMSDSIZE', 'PRIM', 'SCND']
     tab = pd.DataFrame(tabrows, columns=columns)
@@ -518,3 +501,4 @@ if  __name__ == '__main__':
         else:
             for superimpose in tab[tab['SIZE'] > 0].iloc:
                 save_superimpose(superimpose)
+    
