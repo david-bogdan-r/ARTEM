@@ -1,3 +1,4 @@
 numpy==1.22.3
 pandas==1.4.2
 scipy==1.8.1
+multiprocessing==2.6.2.1
