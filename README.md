@@ -58,9 +58,9 @@ The three-atomic representations used in the representations 3-4 include three b
 <span style="color:#8e7cc3">C5</span>, <span style="color:#674ea7">C4</span>, <span style="color:#351c75">C2</span>
 
 
-The five- and three-atomic representations of specific nucleotides can be learned from the nucleotide atomic representation library [lib/nar.py](lib/nar.py). Here you can also manually add new nucleotides or change the representations for existing ones, if necessary. 
+The five- and three-atomic representations of specific nucleotides can be learned from the nucleotide atomic representation library [lib/nar.py](lib/nar.py). Here new nucleotides can be manually added or representations for existing nucleotides can be changed, if necessary.
 
-## Examples
+## **Examples**
 
 # Installation
 Clone the GitHub repository by typing
