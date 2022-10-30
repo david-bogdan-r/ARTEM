@@ -400,7 +400,11 @@ if  __name__ == '__main__':
         if saveres:
             ssmask = qstruct.get_res_mask(saveres)
         else:
-            ssmask = qresstruct.tab['id'].astype(bool)
+            if qneg:
+                ssmask = qstruct.get_res_mask(qresneg)
+                ssmask ^= True
+            else:
+                ssmask = qstruct.get_res_mask(qres)
     
     
     # ARTEM Computations 
