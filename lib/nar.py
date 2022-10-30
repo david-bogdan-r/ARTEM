@@ -101,9 +101,10 @@ carrier = set.intersection(
     )
 )
 
+
 seed_res_repr_ = seed_res_repr
 seed_res_repr  = {}
 for res in carrier:
     seed_res_repr[res] = [
-        sar[res] for sar in seed_res_repr_
+        srr[res] for srr in seed_res_repr_
     ]
