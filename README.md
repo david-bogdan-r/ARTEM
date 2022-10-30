@@ -7,7 +7,6 @@
 - [Contents](#contents)
 - [How it works](#how-it-works)
   - [Coordinate representation of nucleotides](#coordinate-representation-of-nucleotides)
-  - [Output](#output)
   - [Examples](#examples)
 - [Installation](#installation)
 - [Usage](#usage)
@@ -62,7 +61,6 @@ The three-atomic representations used in the representations 3-4 include three b
 
 The five- and three-atomic representations of specific nucleotides can be learned from the nucleotide atomic representation library [lib/nar.py](lib/nar.py). Here you can also manually add new nucleotides or change the representations for existing ones, if necessary. 
 
-## Output
 ## Examples
 
 # Installation
@@ -163,7 +161,12 @@ Clone the GitHub repository by typing
 
 
 # Requirements
+numpy==1.22.3
+pandas==1.4.2
+scipy==1.8.1
+
 # Time & Memory usage
+The implementation with default parameters takes around one minute to run an entire 5,970-residue eukaryotic ribosome (PDB entry 7O7Y) against a 160-residue TPP riboswitch (PDB entry 2GDI) on 32 cores, taking under 2Gb RAM at peak on an AMD Ryzen 9 5950X machine with 128Gb RAM. On the same machine on 32 cores a run of a 2,828-residue LSU rRNA (PDB entry 1FFK) against itself requires 20 minutes in time and 70Gb of RAM.
 
 # Contacts
 
