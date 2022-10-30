@@ -154,13 +154,12 @@ Clone the GitHub repository by typing
             :STRING
                 to determine the residues with a specified type (e.g. ':A',  
                 ':G' etc.)
-            :_INT
-                to determine the residue with the specified INT index
-            :_INT_INT
-                to determine the residues with indexes in a given range
-            :_INTCHAR
+            :_INT[CHAR]
                 to determine the residue with the specified index INT and  
                 the specified type CHAR
+            :_INT_INT
+                to determine the residues with indexes in a given range
+
 
 
 # Requirements
