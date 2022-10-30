@@ -21,7 +21,7 @@
 The ARTEM method of superimposing an arbitrary RNA spatial structure $Y$ on the RNA structure $X$ is performed in two main steps:
 
 1. superimposition of $Y$ on $X$ by a residue pair $p=(X_i, Y_j)$  
-2. superimposition of $Y$ on $X$ by the set of residue pairs $s=\{(X_{i_0}, Y_{i_0}), (X_{i_1}, Y_{i_1}), ..., (X_{i_k}, Y_{i_k})\}$, which are mutually nearest as a result of superimposition 1
+2. superimposition of $Y$ on $X$ by the set of residue pairs $s=[(X_{i_0}, Y_{i_0}), (X_{i_1}, Y_{i_1}), ..., (X_{i_k}, Y_{i_k})]$, which are mutually nearest as a result of superimposition 1
 
 In both cases, the superposition is an application of the linear operator $L$ to the structure $Y$, which minimizes RMSD on a given $p$ or $s$ set of residue pairs. Finding such an operator $L$ is implemented by the [Kabsch algorithm](https://en.wikipedia.org/wiki/Kabsch_algorithm) via SVD decomposition.
  
