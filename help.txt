@@ -62,11 +62,9 @@ Options
             Range and/or types of residues
             :STRING
                 to determine the residues with a specified type (e.g. ':A', ':G' etc.)
-            :_INT
-                to determine the residue with the specified INT index
+            :_INT[CHAR]
+                to determine the residue with the specified index INT and the specified type CHAR
             :_INT_INT
                 to determine the residues with indexes in a given range
-            :_INTCHAR
-                to determine the residue with the specified index INT and the specified type CHAR
 
 for more details see ./README.md
