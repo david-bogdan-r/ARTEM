@@ -150,8 +150,7 @@ Clone the GitHub repository by typing
         :[STRING][_INT[CHAR|_INT]
             Range and/or types of residues
             :STRING
-                to determine the residues with a specified type (e.g. ':A',  
-                ':G' etc.)
+                to determine the residues with a specified type (e.g. ':A', ':G' etc.)
             :_INT[CHAR]
                 to determine the residue with the specified index INT and  
                 the specified type CHAR
