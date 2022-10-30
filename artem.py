@@ -276,6 +276,7 @@ if  __name__ == '__main__':
             rformat = 'PDB'
     else:
         rformat = rformat.upper()
+        rformat = 'CIF' if rformat == 'MMCIF' else rformat
     
     q       = kwargs.get('q')
     qres    = kwargs.get('qres', qres)
@@ -293,6 +294,7 @@ if  __name__ == '__main__':
             qformat = 'PDB'
     else:
         qformat = qformat.upper()
+        qformat = 'CIF' if qformat == 'MMCIF' else qformat
     
     sizemin     = float(kwargs.get('sizemin', sizemin))
     sizemax     = float(kwargs.get('sizemax', sizemax))
