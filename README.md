@@ -60,7 +60,7 @@ The three-atomic representations used in the representations 3-4 include three b
 
 The five- and three-atomic representations of specific nucleotides can be learned from the nucleotide atomic representation library [lib/nar.py](lib/nar.py). Here new nucleotides can be manually added or representations for existing nucleotides can be changed, if necessary.
 
-## **Examples**
+## Examples
 
 # Installation
 Clone the GitHub repository by typing
@@ -72,7 +72,7 @@ Clone the GitHub repository by typing
 
     python3 artem.py r=FILENAME q=FILENAME rres=STRING qres=STRING saveto=FOLDER saveres=STRING rmsdmin=FLOAT rmsdmax=FLOAT sizemin=FLOAT sizemax=FLOAT rmsdsizemin=FLOAT rmsdsizemax=FLOAT matchrange=FLOAT rformat=KEYWORD qformat=KEYWORD saveformat=KEYWORD threads=INT rseed=STRING qseed=STRING rresneg=STRING qresneg=STRING
 
-## Options
+## Options 
 
     r=FILENAME
         Path to the reference structure in PDB/mmCIF format.

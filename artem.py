@@ -285,7 +285,7 @@ if  __name__ == '__main__':
     qformat = kwargs.get('qformat', None)
     qname, qext = q.split(os.sep)[-1].split('.')
     qext = qext.upper()
-    
+    qext = 'CIF' if qext == 'MMCIF' else qext
     if not qformat:
         if qext in {'PDB', 'CIF'}:
             qformat = qext
