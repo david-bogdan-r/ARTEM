@@ -171,4 +171,3 @@ The implementation with default parameters takes around one minute to run an ent
 
 David Bogdan  
 *e-mail: bogdan.d@phystech.edu*  
-*telegram: https://t.me/david_bogdan*
