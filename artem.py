@@ -265,36 +265,39 @@ if  __name__ == '__main__':
     rneg    = bool(rresneg)
     rseed   = kwargs.get('rseed', '#')
     
-    rformat = kwargs.get('rformat', None)
     rname, rext = r.split(os.sep)[-1].split('.')
     rext = rext.upper()
     rext = 'CIF' if rext == 'MMCIF' else rext
-    if not rformat:
-        if rext in {'PDB', 'CIF'}:
-            rformat = rext
-        else:
+    
+    rformat = kwargs.get('rformat', '').upper()
+    rformat = 'CIF' if rformat == 'MMCIF' else rformat
+    
+    if rformat not in {'PDB', 'CIF'}:
+        if rext not in {'PDB', 'CIF'}:
             rformat = 'PDB'
-    else:
-        rformat = rformat.upper()
-        rformat = 'CIF' if rformat == 'MMCIF' else rformat
+        else:
+            rformat = rext
+    
     
     q       = kwargs.get('q')
     qres    = kwargs.get('qres', qres)
     qresneg = kwargs.get('qresneg', qresneg)
     qneg    = bool(qresneg)
     qseed   = kwargs.get('qseed', '#')
-    qformat = kwargs.get('qformat', None)
+    
     qname, qext = q.split(os.sep)[-1].split('.')
     qext = qext.upper()
     qext = 'CIF' if qext == 'MMCIF' else qext
-    if not qformat:
-        if qext in {'PDB', 'CIF'}:
-            qformat = qext
-        else:
+    
+    qformat = kwargs.get('qformat', '').upper()
+    qformat = 'CIF' if qformat == 'MMCIF' else qformat
+    
+    if qformat not in {'PDB', 'CIF'}:
+        if qext not in {'PDB', 'CIF'}:
             qformat = 'PDB'
-    else:
-        qformat = qformat.upper()
-        qformat = 'CIF' if qformat == 'MMCIF' else qformat
+        else:
+            qformat = qext
+    
     
     sizemin     = float(kwargs.get('sizemin', sizemin))
     sizemax     = float(kwargs.get('sizemax', sizemax))
