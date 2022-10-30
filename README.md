@@ -25,7 +25,7 @@ The ARTEM method of superimposing an arbitrary RNA spatial structure $Y$ on the 
 
 In both cases, the superposition is an application of the linear operator $L$ to the structure $Y$, which minimizes RMSD on a given $p$ or $s$ set of residue pairs. Finding such an operator $L$ is implemented by the [Kabsch algorithm](https://en.wikipedia.org/wiki/Kabsch_algorithm) via SVD decomposition.
  
-ARTEM tool performs steps 1-2 for all possible or user-restricted residue pairs between the $X$ and $Y$ structures. On the standard output is fed a table of matches between $p$ and $s$ sets of residue pairs in DSSR format and metrics SIZE of set $s$, RMSD of superposition and the value of RMSD / SIZE. On request, ARTEM saves all defined Y structure impositions in the selected format (.pdb or .cif)
+ARTEM tool performs steps 1-2 for all possible or user-restricted residue pairs between the $X$ and $Y$ structures. On the standard output is fed a table of matches between $p$ and $s$ sets of residue pairs in DSSR format and metrics SIZE of set $s$, RMSD of superposition on the set $s$ and the value of RMSD / SIZE. On request, ARTEM saves all defined Y structure impositions in the selected format (.pdb or .cif)
 
 
 ## Coordinate representation of nucleotides
@@ -42,20 +42,20 @@ ARTEM uses four representations for each nucleotide residue of the $X$ and $Y$ s
 The five-atomic representation used in representations 1-2 includes a phosphate atom, a ribose center of mass, and three base atoms:
 
 - for Purines  
-<span style="color:#b00b13">P</span>, <span style="color:#6aa84f ">C1' C2' O2' C3' O3' C4' O4' C5' O5'</span>, <span style="color:#8e7cc3">N9</span>, <span style="color:#674ea7">C2</span>, <span style="color:#351c75">C6</span>
+'P', "C1' C2' O2' C3' O3' C4' O4' C5' O5'", 'N9', 'C2', 'C6'
 - for Pyrimidines  
-<span style="color:#b00b13">P</span>, <span style="color:#6aa84f ">C1' C2' O2' C3' O3' C4' O4' C5' O5'</span>, <span style="color:#8e7cc3">N1</span>, <span style="color:#674ea7">C2</span>, <span style="color:#351c75">C4</span>
+'P', "C1' C2' O2' C3' O3' C4' O4' C5' O5'", 'N1', 'C2', 'C4'
 - for Pyrimidins with a C-glycosidic bond  
-<span style="color:#b00b13">P</span>, <span style="color:#6aa84f ">C1' C2' O2' C3' O3' C4' O4' C5' O5'</span>, <span style="color:#8e7cc3">C5</span>, <span style="color:#674ea7">C4</span>, <span style="color:#351c75">C2</span>
+'P', "C1' C2' O2' C3' O3' C4' O4' C5' O5'", 'C5', 'C4', 'C2'
 
 The three-atomic representations used in the representations 3-4 include three base atoms:
 
 - for Purines  
-<span style="color:#8e7cc3">N9</span>, <span style="color:#674ea7">C2</span>, <span style="color:#351c75">C6</span>
+'N9', 'C2', 'C6'
 - for Pyrimidines  
-<span style="color:#8e7cc3">N1</span>, <span style="color:#674ea7">C2</span>, <span style="color:#351c75">C4</span>
+'N1', 'C2', 'C4'
 - for Pyrimidins with a C-glycosidic bond  
-<span style="color:#8e7cc3">C5</span>, <span style="color:#674ea7">C4</span>, <span style="color:#351c75">C2</span>
+'C5', 'C4', 'C2'
 
 
 The five- and three-atomic representations of specific nucleotides can be learned from the nucleotide atomic representation library [lib/nar.py](lib/nar.py). Here new nucleotides can be manually added or representations for existing nucleotides can be changed, if necessary.
