@@ -42,20 +42,20 @@ ARTEM uses four representations for each nucleotide residue of the $X$ and $Y$ s
 The five-atomic representation used in representations 1-2 includes a phosphate atom, a ribose center of mass, and three base atoms:
 
 - for Purines  
-**<span style="color:#b00b13">P</span>, <span style="color:#6aa84f ">C1' C2' O2' C3' O3' C4' O4' C5' O5'</span>, <span style="color:#8e7cc3">N9</span>, <span style="color:#674ea7">C2</span>, <span style="color:#351c75">C6</span>**
+<span style="color:#b00b13">P</span>, <span style="color:#6aa84f ">C1' C2' O2' C3' O3' C4' O4' C5' O5'</span>, <span style="color:#8e7cc3">N9</span>, <span style="color:#674ea7">C2</span>, <span style="color:#351c75">C6</span>
 - for Pyrimidines  
-**<span style="color:#b00b13">P</span>, <span style="color:#6aa84f ">C1' C2' O2' C3' O3' C4' O4' C5' O5'</span>, <span style="color:#8e7cc3">N1</span>, <span style="color:#674ea7">C2</span>, <span style="color:#351c75">C4</span>**
+<span style="color:#b00b13">P</span>, <span style="color:#6aa84f ">C1' C2' O2' C3' O3' C4' O4' C5' O5'</span>, <span style="color:#8e7cc3">N1</span>, <span style="color:#674ea7">C2</span>, <span style="color:#351c75">C4</span>
 - for Pyrimidins with a C-glycosidic bond  
-**<span style="color:#b00b13">P</span>, <span style="color:#6aa84f ">C1' C2' O2' C3' O3' C4' O4' C5' O5'</span>, <span style="color:#8e7cc3">C5</span>, <span style="color:#674ea7">C4</span>, <span style="color:#351c75">C2</span>**
+<span style="color:#b00b13">P</span>, <span style="color:#6aa84f ">C1' C2' O2' C3' O3' C4' O4' C5' O5'</span>, <span style="color:#8e7cc3">C5</span>, <span style="color:#674ea7">C4</span>, <span style="color:#351c75">C2</span>
 
 The three-atomic representations used in the representations 3-4 include three base atoms:
 
 - for Purines  
-**<span style="color:#8e7cc3">N9</span>, <span style="color:#674ea7">C2</span>, <span style="color:#351c75">C6</span>**
+<span style="color:#8e7cc3">N9</span>, <span style="color:#674ea7">C2</span>, <span style="color:#351c75">C6</span>
 - for Pyrimidines  
-**<span style="color:#8e7cc3">N1</span>, <span style="color:#674ea7">C2</span>, <span style="color:#351c75">C4</span>**
+<span style="color:#8e7cc3">N1</span>, <span style="color:#674ea7">C2</span>, <span style="color:#351c75">C4</span>
 - for Pyrimidins with a C-glycosidic bond  
-**<span style="color:#8e7cc3">C5</span>, <span style="color:#674ea7">C4</span>, <span style="color:#351c75">C2</span>**
+<span style="color:#8e7cc3">C5</span>, <span style="color:#674ea7">C4</span>, <span style="color:#351c75">C2</span>
 
 
 The five- and three-atomic representations of specific nucleotides can be learned from the nucleotide atomic representation library [lib/nar.py](lib/nar.py). Here you can also manually add new nucleotides or change the representations for existing ones, if necessary. 
