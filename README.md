@@ -81,28 +81,41 @@ Clone the GitHub repository by typing
         Path to the reference structure in PDB/mmCIF format.
 
     q=FILENAME
-        Path to the query structure (the one that ARTEM superimpose to reference) in PDB/mmCIF format.
+        Path to the query structure (the one that ARTEM superimpose to  
+        reference) in PDB/mmCIF format.
 
     rres=STRING, qres=STRING
-        List of specifying the residues that ARTEM consider as part of the reference/query structure (and ignore all the other residues).
+        List of specifying the residues that ARTEM consider as part of  
+        the reference/query structure (and ignore all the other residues).
         See res options format below.
 
     rresneg=STRING, qresneg=STRING
-        The inversion of rres and qres - ARTEM ignore all the residues that correspond to resneg parameters. If both rres and rresneg are specified simultaneously - ARTEM ignore rres and use rresneg (i.e. negative parameters have higher priority.
+        The inversion of rres and qres - ARTEM ignore all the residues that  
+        correspond to resneg parameters. If both rres and rresneg are specified  
+        simultaneously - ARTEM ignore rres and use rresneg (i.e. negative  
+        parameters have higher priority.
         See res options format below.
 
     rseed=STRING, qseed=STRING
-        The subsets of rres and qres that will be used as seeds. The nomenclature used is similar to the res parameters, see it below.
+        The subsets of rres and qres that will be used as seeds.  
+        The nomenclature used is similar to the res parameters, see it below.
 
     saveto=FOLDER
-        Path to the folder where impositions of the queried structure will be saved. If the folder does not exist, it will be created.
+        Path to the folder where impositions of the queried structure will  
+        be saved. If the folder does not exist, it will be created.
 
     saveres=STRING
-        List of specifying the residues of the queried structure ARTEM will save. By default the value of qres is used.
+        List of specifying the residues of the queried structure ARTEM  
+        will save. By default the value of qres is used.
         See res options format below.
 
-    rmsdmin=FLOAT, rmsdmax=FLOAT, sizemin=FLOAT, sizemax=FLOAT, rmsdsizemin=FLOAT, rmsdsizemax=FLOAT, matchrange=FLOAT  
-        Thresholds for RMSD (rmsdmin, rmsdmax), SIZE (sizemin, sizemax), RMSD/SIZE (rmsdsizemin, rmsdsizemax), and the maximal range for mutually closest residues (matchrange). All the min/max parameters (except matchrange) define which superpositions will be printed to stdout (and saved to the saveto folder).  
+    rmsdmin=FLOAT, rmsdmax=FLOAT, sizemin=FLOAT, sizemax=FLOAT,  
+    rmsdsizemin=FLOAT, rmsdsizemax=FLOAT, matchrange=FLOAT  
+        Thresholds for RMSD (rmsdmin, rmsdmax), SIZE (sizemin, sizemax),  
+        RMSD/SIZE (rmsdsizemin, rmsdsizemax), and the maximal range for  
+        mutually closest residues (matchrange). All the min/max parameters  
+        (except matchrange) define which superpositions will be printed to  
+        stdout (and saved to the saveto folder).  
         The defaults:
             rmsdmin     = 0.
             rmsdmax     = 1e10
@@ -113,10 +126,17 @@ Clone the GitHub repository by typing
             matchrange  = 3.
 
     rformat=KEYWORD, qformat=KEYWORD, saveformat=KEYWORD
-        Formats of the input reference structure (rformat), query structure (qformat), and the output superpositions to be saved (saveformat). By default rformat and qformat are set to PDB, saveformat by default is set to be equal to qformat. When specified and equal to "pdb" (case-insensitive) - ARTEM set it to "PDB", when equal to "cif" or "mmcif" (case-insensitive) - ARTEM set it to "CIF", otherwise raise an error.
+        Formats of the input reference structure (rformat), query structure  
+        (qformat), and the output superpositions to be saved (saveformat).  
+        By default rformat and qformat are set to PDB, saveformat by default  
+        is set to be equal to qformat. When specified and equal to "pdb"  
+        (case-insensitive) - ARTEM set it to "PDB", when equal to "cif" or  
+        "mmcif" (case-insensitive) - ARTEM set it to "CIF", otherwise raise  
+        an error.
 
     threads=INT
-        Number of CPUs to use. 1 by default. ARTEM multiprocessing is available only for UNIX-like systems.
+        Number of CPUs to use. 1 by default. ARTEM multiprocessing is  
+        available only for UNIX-like systems.
 
     ***
     res options format
@@ -124,19 +144,23 @@ Clone the GitHub repository by typing
     [#[INT]][/[STRING]][:[STRING][_INT[CHAR|_INT]]
     
         #[INT]
-            Reference/query structure model number. If not specified, the default is the first model #1. If an empty # number is specified, all models of the structure are used.
+            Reference/query structure model number. If not specified, the 
+             default is the first model #1. If an empty # number is specified,  
+             all models of the structure are used.
         /[STRING]
             Chain label
         :[STRING][_INT[CHAR|_INT]
             Range and/or types of residues
             :STRING
-                to determine the residues with a specified type (e.g. ':A', ':G' etc.)
+                to determine the residues with a specified type (e.g. ':A',  
+                ':G' etc.)
             :_INT
                 to determine the residue with the specified INT index
             :_INT_INT
                 to determine the residues with indexes in a given range
             :_INTCHAR
-                to determine the residue with the specified index INT and the specified type CHAR
+                to determine the residue with the specified index INT and  
+                the specified type CHAR
 
 
 # Requirements
