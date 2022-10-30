@@ -1,6 +1,8 @@
 # Nucleotide atomic representation 
 
-five_atom_repr = {
+from pandas import Index
+
+_5_atomic_representation = {
     # Purine
     'A':   ('P', "C1' C2' O2' C3' O3' C4' O4' C5' O5'", 'N9', 'C2', 'C6'),
     'G':   ('P', "C1' C2' O2' C3' O3' C4' O4' C5' O5'", 'N9', 'C2', 'C6'),
@@ -37,7 +39,7 @@ five_atom_repr = {
 }
 
 
-three_atom_repr = {
+_3_atomic_representation = {
     # Purine
     'A':   ('N9', 'C2', 'C6'),
     'G':   ('N9', 'C2', 'C6'),
@@ -74,27 +76,34 @@ three_atom_repr = {
 }
 
 
-def join_res_repr(seed_res_repr:'tuple') -> 'dict':
-    carrier = set.intersection(
-        *map(
-            lambda x: set(x.keys()),
-            seed_res_repr
-        )
+seed_res_repr = (
+    _5_atomic_representation,   # For primary alignment
+    _5_atomic_representation,   # To calculate centers of mass
+    _3_atomic_representation,   # For secondary alignment
+    _3_atomic_representation,   # To calculate the RMSD
+)
+
+prepared = []
+for res_repr in seed_res_repr:
+    if res_repr in prepared:
+        continue
+    
+    for res, atoms in res_repr.items():
+        res_repr[res] = [Index(atom.split()) for atom in atoms]
+    
+    prepared.append(res_repr)
+
+
+carrier = set.intersection(
+    *map(
+        lambda x: set(x.keys()),
+        seed_res_repr
     )
-    
-    res_repr = {}
-    for res in carrier:
-        res_repr[res] = [rr[res] for rr in  seed_res_repr]
-    
-    return res_repr
+)
 
-
-if __name__.endswith('nar'):
-    from pandas import Index
-    
-    loc = locals().copy()
-    for k, v in loc.items():
-        if not k.startswith('_') and type(v) == dict:
-            for kk in v:
-                v[kk] = [Index(vv.split()) for vv in v[kk]]
-            locals()[k] = v
+seed_res_repr_ = seed_res_repr
+seed_res_repr  = {}
+for res in carrier:
+    seed_res_repr[res] = [
+        sar[res] for sar in seed_res_repr_
+    ]

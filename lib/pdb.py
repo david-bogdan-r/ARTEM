@@ -212,7 +212,7 @@ class Structure:
             spl['#'] = int(spl['#'])
         else:
             if spl['#'] == None:
-                spl['#'] = 1
+                spl['#'] = 1 # Not OK.
         
         if spl[':']:
             rng = spl[':'].split('_')

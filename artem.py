@@ -7,9 +7,8 @@ import numpy  as np
 import multiprocessing as mp
 
 from scipy.spatial import KDTree
-from lib import nar
-from lib import pdb
-
+from lib.pdb import Structure, parser
+from lib.nar import seed_res_repr
 
 
 # ignore SettingWithCopyWarning
@@ -18,8 +17,8 @@ pd.set_option('mode.chained_assignment', None)
 
 # Defaults
 
-rres    = ''
-qres    = ''
+rres    = '#1'
+qres    = '#1'
 rresneg = ''
 qresneg = ''
 
@@ -36,30 +35,22 @@ saveres = ''
 
 threads = 1
 
-seed_res_repr = (
-    nar.five_atom_repr,     # For primary alignment
-    nar.five_atom_repr,     # To calculate centers of mass
-    nar.three_atom_repr,    # For secondary alignment
-    nar.three_atom_repr,    # To calculate the RMSD
-)
-seed_res_repr = nar.join_res_repr(seed_res_repr)
-
-
 keep = 'last'   # keep alternative atom locations: 'first', 'last', False
 
+help_args = {'--H', '-H', '--h', '-h', '--help', '-help'}
 
 # Functions
 
 def get_transform(X:'np.ndarray', Y:'np.ndarray'):
     '''
-    Returns a linear operator minimizing the RMSD between matrix q and r.
+    Returns a linear operator minimizing the RMSD between matrix X and Y.
     
     Input:
-        r - N x 3 np.ndarray matrix
-        q - N x 3 np.ndarray matrix
+        X - N x 3 np.ndarray matrix
+        Y - N x 3 np.ndarray matrix
     Output:
-        rot  - 3 x 3 rotation np.ndarray matrix
-        tran - 3 - np.ndarray vector 
+        A - 3 x 3 rotation np.ndarray matrix
+        B - 3 - bias np.ndarray vector 
     '''
     X_avg = X.mean(axis=0)
     Y_avg = Y.mean(axis=0)
@@ -115,7 +106,7 @@ def vstack(ndarray_pairs):
     X, Y = zip(*ndarray_pairs)
     return np.vstack(X), np.vstack(Y)
 
-def describe(struct: 'pdb.Structure'):
+def describe(struct: 'Structure'):
     tab  = struct.get_tab().copy()
     tab.set_index('auth_atom_id', inplace=True)
     
@@ -227,7 +218,7 @@ def save_superimpose(superimpose:'pd.Series') -> 'None':
     )
     tab_3['pdbx_PDB_model_num'] = max_models + 2
     
-    struct = pdb.Structure('{}_{}'.format(qstruct, superimpose.name))
+    struct = Structure('{}_{}'.format(qstruct, superimpose.name))
     used_cols = min([tab_1.columns, tab_2.columns], key=len)
     tab = pd.concat([tab_1[used_cols], tab_2[used_cols], tab_3[used_cols]])
     
@@ -250,16 +241,18 @@ if  __name__ == '__main__':
     # Processing inputs
     
     argv = sys.argv[1:]
-    if argv[0] in {'--H', '-H', '--h', '-h', '--help', '-help'}:
-        with open('README.md', 'r') as rdme:
-            print(*rdme)
+    if any([arg in help_args for arg in argv]):
+        with open('help.txt', 'r') as helper:
+            print(helper.read())
         exit()
     else:
         kwargs = dict([arg.split('=') for arg in argv])
     
     threads = int(kwargs.get('threads', threads))
     if threads != 1:
-        mp.set_start_method('fork')     # ARTEM multiprocessing is available only for UNIX-like systems
+        # ARTEM multiprocessing is available only for UNIX-like systems
+        
+        mp.set_start_method('fork')
         if threads <= 0:
             threads = mp.cpu_count()
         else:
@@ -275,8 +268,9 @@ if  __name__ == '__main__':
     rformat = kwargs.get('rformat', None)
     rname, rext = r.split(os.sep)[-1].split('.')
     rext = rext.upper()
+    rext = 'CIF' if rext == 'MMCIF' else rext
     if not rformat:
-        if rext in pdb.formats:
+        if rext in {'PDB', 'CIF'}:
             rformat = rext
         else:
             rformat = 'PDB'
@@ -291,8 +285,9 @@ if  __name__ == '__main__':
     qformat = kwargs.get('qformat', None)
     qname, qext = q.split(os.sep)[-1].split('.')
     qext = qext.upper()
+    
     if not qformat:
-        if qext in pdb.formats:
+        if qext in {'PDB', 'CIF'}:
             qformat = qext
         else:
             qformat = 'PDB'
@@ -313,7 +308,7 @@ if  __name__ == '__main__':
     
     # Model preprocessing
     
-    rstruct  = pdb.parser(r, rformat, rname)
+    rstruct  = parser(r, rformat, rname)
     rstruct.drop_duplicates_alt_id(keep=keep)
     
     rresstruct = rstruct.get_res_substruct(
@@ -350,7 +345,7 @@ if  __name__ == '__main__':
     r_ind = [i for i, code in enumerate(r_code) if code in rseed_code]
     
     
-    qstruct  = pdb.parser(q, qformat, qname)
+    qstruct  = parser(q, qformat, qname)
     qstruct.drop_duplicates_alt_id(keep=keep)
     
     qneg = bool(qresneg)
@@ -394,14 +389,11 @@ if  __name__ == '__main__':
         os.makedirs(saveto, exist_ok=True)
         saveres    = kwargs.get('saveres', saveres)
         saveformat = kwargs.get('saveformat', qformat).upper()
-        
-        if saveformat not in pdb.formats:
-            if saveformat == 'MMCIF':
-                saveformat = 'CIF'
-            else:
-                msg = '''Invalid saveformat value
-                \rAcceptable values for saveformat are PDB, CIF or MMCIF'''
-                raise TypeError(msg)
+        saveformat = 'CIF' if saveformat == 'MMCIF' else saveformat
+        if saveformat not in {'PDB', 'CIF'}:
+            msg = '''Invalid saveformat value
+            \rAcceptable values for saveformat are PDB, CIF or MMCIF'''
+            raise TypeError(msg)
         
         if saveres:
             ssmask = qstruct.get_res_mask(saveres)
@@ -410,7 +402,7 @@ if  __name__ == '__main__':
     
     
     # ARTEM Computations 
-    result = {}
+    result     = {}
     indx_pairs = list(itertools.product(r_ind, q_ind))
     r_avg_tree = KDTree(r_avg)
     if threads == 1:
@@ -438,9 +430,7 @@ if  __name__ == '__main__':
                         result[out] = [i]
                 i += 1
             cnt += delta
-            # gc.collect()
-    
-    items = iter(result.items())
+    items = result.items()
     del result
     
     # Output
@@ -448,10 +438,10 @@ if  __name__ == '__main__':
     tabrows = []
     
     if sizemin <= 0:
-        for pair in itertools.product(rseed_npc, qseed_npc | qseed_code):
-            tabrows.append((None, 0, None, None, '='.join(pair), None))
-        for pair in itertools.product(rseed_npc | rseed_code, qseed_npc):
-            tabrows.append((None, 0, None, None, '='.join(pair), None))
+        for npc in rseed_npc:
+            tabrows.append((None, 0, None, None, npc, None))
+        for npc in qseed_npc:
+            tabrows.append((None, 0, None, None, None, npc))
     
     for k, v in items:
         size = len(k) - 1
@@ -489,11 +479,10 @@ if  __name__ == '__main__':
         sep='\t',
         float_format='{:0.3f}'.format,
     )
-     
+    
     if saveto:
-        if 'pool' in dir():
+        if 'pool' in globals():
             pool.map(save_superimpose, tab[tab['SIZE'] > 0].iloc)
         else:
             for superimpose in tab[tab['SIZE'] > 0].iloc:
                 save_superimpose(superimpose)
-    
