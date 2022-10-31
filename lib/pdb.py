@@ -227,76 +227,79 @@ class Structure:
         return spl
     
     
-    def get_res_mask(self, res: 'str') -> 'pd.Series':
+    def get_res_mask(self, res:'str') -> 'pd.Series':
         tab = self.tab
-        spl = Structure._res_split(res)
         
-        mod = spl['#']
-        if mod:
-            mod_mask = tab['pdbx_PDB_model_num'].eq(mod)
-        else:
-            mod_mask = tab['pdbx_PDB_model_num'].astype(bool)
-        
-        chn = spl['/']
-        if chn:
-            chn_mask = tab['auth_asym_id'].eq(chn)
-        else:
-            chn_mask = tab['auth_asym_id'].astype(bool)
-        
-        rng  = spl[':']
-        if rng:
-            case = len(rng)
-        else:
-            case = 0
-        
-        # res wo ':'
-        if case == 0:
-            rng_mask = tab['auth_seq_id'].astype(bool)
-       
-        # ':N'
-        elif case == 1:
-            res = rng[0]
-            if res:
-                rng_mask = tab['auth_comp_id'].eq(rng[0])
+        mask = tab['id'].astype(bool) ^ True
+        for subres in res.split():
+            spl = Structure._res_split(subres)
+            
+            mod = spl['#']
+            if mod:
+                mod_mask = tab['pdbx_PDB_model_num'].eq(mod)
             else:
-                rng_mask = tab['auth_comp_id'].astype(bool)
+                mod_mask = tab['pdbx_PDB_model_num'].astype(bool)
+            
+            chn = spl['/']
+            if chn:
+                chn_mask = tab['auth_asym_id'].eq(chn)
+            else:
+                chn_mask = tab['auth_asym_id'].astype(bool)
+            
+            rng  = spl[':']
+            if rng:
+                case = len(rng)
+            else:
+                case = 0
+            
+            # res wo ':'
+            if case == 0:
+                rng_mask = tab['auth_seq_id'].astype(bool)
         
-        #':_num' | ':_numN' | ':N_num' | ':N1_numN2'
-        elif case == 2:
-            res, num  = rng
-            if type(num) == int:
+            # ':N'
+            elif case == 1:
+                res = rng[0]
                 if res:
+                    rng_mask = tab['auth_comp_id'].eq(rng[0])
+                else:
+                    rng_mask = tab['auth_comp_id'].astype(bool)
+            
+            #':_num' | ':_numN' | ':N_num' | ':N1_numN2'
+            elif case == 2:
+                res, num  = rng
+                if type(num) == int:
+                    if res:
+                        rng_mask = tab['auth_seq_id'].eq(num) \
+                            & tab['auth_comp_id'].eq(res)
+                    else:
+                        rng_mask = tab['auth_seq_id'].eq(num)
+                else:
+                    # ':N1_numN2' = ':_numN2' even if N1 != N2
+                    dgt = ''
+                    for i, c in enumerate(num):
+                        if c.isdigit():
+                            dgt += c
+                        else:
+                            break
+                    res = num[i:]
+                    num = int(dgt)
                     rng_mask = tab['auth_seq_id'].eq(num) \
                         & tab['auth_comp_id'].eq(res)
+            
+            # ':_num1_num2' | ':N_num1_num2'
+            elif case == 3:
+                res, num_1, num_2 = rng
+                if res:
+                    rng_mask = tab['auth_comp_id'].eq(res) \
+                        & tab['auth_seq_id'].between(num_1, num_2)
                 else:
-                    rng_mask = tab['auth_seq_id'].eq(num)
+                    rng_mask = tab['auth_seq_id'].between(num_1, num_2)
+            
+            # incorrect res
             else:
-                # ':N1_numN2' = ':_numN2' even if N1 != N2
-                dgt = ''
-                for i, c in enumerate(num):
-                    if c.isdigit():
-                        dgt += c
-                    else:
-                        break
-                res = num[i:]
-                num = int(dgt)
-                rng_mask = tab['auth_seq_id'].eq(num) \
-                    & tab['auth_comp_id'].eq(res)
+                rng_mask = tab['auth_seq_id'].astype(bool) ^ True
         
-        # ':_num1_num2' | ':N_num1_num2'
-        elif case == 3:
-            res, num_1, num_2 = rng
-            if res:
-                rng_mask = tab['auth_comp_id'].eq(res) \
-                    & tab['auth_seq_id'].between(num_1, num_2)
-            else:
-                rng_mask = tab['auth_seq_id'].between(num_1, num_2)
-        
-        # incorrect res
-        else:
-            rng_mask = tab['auth_seq_id'].astype(bool) ^ True
-        
-        mask = mod_mask & chn_mask & rng_mask
+            mask |= mod_mask & chn_mask & rng_mask
         
         return mask
     
@@ -311,6 +314,7 @@ class Structure:
         
         tab = self.tab
         msk = self.get_res_mask(res)
+        
         if neg:
             msk ^=True
         tab = tab[msk]
