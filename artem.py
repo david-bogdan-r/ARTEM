@@ -415,14 +415,14 @@ if  __name__ == '__main__':
     indx_pairs = list(itertools.product(r_ind, q_ind))
     r_avg_tree = KDTree(r_avg)
     if threads == 1:
-        i = 0 
-        for out in (artem(m, n) for m, n in indx_pairs):
+        inp = indx_pairs
+        for p, out in zip(inp, (artem(m, n) for m, n in inp)):
             if out:
+                m, n = p 
                 if out in result:
-                    result[out].append(i)
+                    result[out].append(m*q_count + n)
                 else:
-                    result[out] = [i]
-            i += 1
+                    result[out] = [m*q_count + n]
     else:
         pool = mp.Pool(threads)
         
@@ -430,14 +430,14 @@ if  __name__ == '__main__':
         cnt     = 0
         cnt_max = len(indx_pairs)
         while cnt < cnt_max:
-            i = cnt 
-            for out in pool.starmap(artem, indx_pairs[cnt:cnt + delta]):
+            inp = indx_pairs[cnt:cnt + delta]
+            for p, out in zip(inp, pool.starmap(artem, inp)):
                 if out:
+                    m, n = p
                     if out in result:
-                        result[out].append(i)
+                        result[out].append(m*q_count + n)
                     else:
-                        result[out] = [i]
-                i += 1
+                        result[out] = [m*q_count + n]
             cnt += delta
     items = result.items()
     del result
