@@ -2,171 +2,229 @@
 
 **A**ligning **R**NA **TE**rtiary **M**otifs (ARTEM) is a tool for superimposing arbitrary RNA spatial structures
 
-# Contents
-<!-- - [ARTEM](#artem)
-- [Contents](#contents) -->
-- [How it works](#how-it-works)
-  - [Coordinate representation of nucleotides](#coordinate-representation-of-nucleotides)
-  - [Examples](#examples)
-- [Installation](#installation)
-- [Usage](#usage)
-  - [Command](#command)
-  - [Options](#options)
-- [Requirements](#requirements)
-- [Time & Memory usage](#time--memory-usage)
-- [Contacts](#contacts)
+# Reference
 
-# How it works
+D.R. Bohdan, V.V. Voronina, J.M. Bujnicki, E.F. Baulin (2022) A comprehensive survey of long-range tertiary interactions and motifs in non-coding RNA structures. bioRxiv.
 
-The ARTEM method of superimposing an arbitrary RNA spatial structure $Y$ on the RNA structure $X$ is performed in two main steps:
+# Check out our [LORA dataset](https://github.com/febos/LORA)
 
-1. superimposition of $Y$ on $X$ by a residue pair $p=(X_i, Y_j)$  
-2. superimposition of $Y$ on $X$ by the set of residue pairs $s=[(X_{i_0}, Y_{i_0}), (X_{i_1}, Y_{i_1}), ..., (X_{i_k}, Y_{i_k})]$, which are mutually nearest as a result of superimposition 1
+# How ARTEM works
 
-In both cases, the superposition is an application of the linear operator $L$ to the structure $Y$, which minimizes RMSD on a given $p$ or $s$ set of residue pairs. Finding such an operator $L$ is implemented by the [Kabsch algorithm](https://en.wikipedia.org/wiki/Kabsch_algorithm) via SVD decomposition.
- 
-ARTEM tool performs steps 1-2 for all possible or user-restricted residue pairs between the $X$ and $Y$ structures. On the standard output is fed a table of matches between $p$ and $s$ sets of residue pairs in DSSR format and metrics SIZE of set $s$, RMSD of superposition on the set $s$ and the value of RMSD / SIZE. On request, ARTEM saves all defined Y structure impositions in the selected format (.pdb or .cif)
+ARTEM reads a reference and a query structure from the specified coordinate files in PDB or in mmCIF format, and, by default, prints a sorted list of their local structural superpositions. The user can choose to save the superimposed versions of the query structure into a specified folder in PDB or in mmCIF format. Each of the saved files will include three models: (1) the entire (according to the "qres" parameter) superimposed query structure, (2) the subset of the reference structure residues used for the superposition, and (3) the subset of the query structure residues used for the superposition. By default, ARTEM reads the entire first models of the input files.
 
-
-## Coordinate representation of nucleotides
-
-ARTEM uses four representations for each nucleotide residue of the $X$ and $Y$ structures:
-
-1. the five-atomic representation for finding a primary alignment operator $L_p$  
-2. center mass of the nucleotide, calculated using the five-atomic representation to find the mutually nearest nucleotides in step 2  
-3. the three-atomic representation for finding the secondary alignment operator $L_s$  
-4. the three-atomic representation for calculating the final RMSD metric  
-
-> A residue that does not have at least one of these representations will be ignored by ARTEM in all 1-2 main calculation steps.
-
-The five-atomic representation used in representations 1-2 includes a phosphate atom, a ribose center of mass, and three base atoms:
-
-- for Purines  
-'P', "C1' C2' O2' C3' O3' C4' O4' C5' O5'", 'N9', 'C2', 'C6'
-- for Pyrimidines  
-'P', "C1' C2' O2' C3' O3' C4' O4' C5' O5'", 'N1', 'C2', 'C4'
-- for Pyrimidins with a C-glycosidic bond  
-'P', "C1' C2' O2' C3' O3' C4' O4' C5' O5'", 'C5', 'C4', 'C2'
-
-The three-atomic representations used in the representations 3-4 include three base atoms:
-
-- for Purines  
-'N9', 'C2', 'C6'
-- for Pyrimidines  
-'N1', 'C2', 'C4'
-- for Pyrimidins with a C-glycosidic bond  
-'C5', 'C4', 'C2'
-
-
-The five- and three-atomic representations of specific nucleotides can be learned from the nucleotide atomic representation library [lib/nar.py](lib/nar.py). Here new nucleotides can be manually added or representations for existing nucleotides can be changed, if necessary.
-
-## Examples
+The ARTEM algorithm works as follows. For each possible single-residue matching seed between the reference and the query structures (as defined by "rseed" and "qseed" parameters) ARTEM superimposes the structures based on the 5-atom representations of the two residues. Then, ARTEM searches for a subset of the reference and query residues that are mutually closest to each other in the current superposition. Finally, ARTEM performs a second superposition using the subset of the mutually closest residues as the assigned residue-residue matchings. Finally, ARTEM prints a sorted list of the produced superpositions to stdout. For each superposition the output includes its ID, RMSD, SIZE, RMSD/SIZE ratio, the list of generative single-residue seeds (PRIM), and the list of the residue-residue matchings (SCND).
 
 # Installation
+
 Clone the GitHub repository by typing
 
     git clone https://github.com/david-bogdan-r/ARTEM.git
 
-# Usage
-## Command
+# Dependencies
 
-    python3 artem.py r=FILENAME q=FILENAME rres=STRING qres=STRING saveto=FOLDER saveres=STRING rmsdmin=FLOAT rmsdmax=FLOAT sizemin=FLOAT sizemax=FLOAT rmsdsizemin=FLOAT rmsdsizemax=FLOAT matchrange=FLOAT rformat=KEYWORD qformat=KEYWORD saveformat=KEYWORD threads=INT rseed=STRING qseed=STRING rresneg=STRING qresneg=STRING
+ARTEM requires three Python3 libraries to be installed:
 
-## Options 
+- numpy
+- pandas
+- scipy
 
-    r=FILENAME
-        Path to the reference structure in PDB/mmCIF format.
+ARTEM was tested with two different Python3 environments:
 
-    q=FILENAME
-        Path to the query structure (the one that ARTEM superimpose to  
-        reference) in PDB/mmCIF format.
+### Ubuntu 20.04
 
-    rres=STRING, qres=STRING
-        List of specifying the residues that ARTEM consider as part of  
-        the reference/query structure (and ignore all the other residues).
-        See res options format below.
+- python==3.8
+- numpy==1.22.3 
+- pandas==1.4.1 
+- scipy==1.8.0 
 
-    rresneg=STRING, qresneg=STRING
-        The inversion of rres and qres - ARTEM ignore all the residues that  
-        correspond to resneg parameters. If both rres and rresneg are specified  
-        simultaneously - ARTEM ignore rres and use rresneg (i.e. negative  
-        parameters have higher priority.
-        See res options format below.
+### MacOS Ventura 13.0
 
-    rseed=STRING, qseed=STRING
-        The subsets of rres and qres that will be used as seeds.  
-        The nomenclature used is similar to the res parameters, see it below.
+- python==3.10
+- numpy==1.22.3 
+- pandas==1.4.2 
+- scipy==1.8.1 
 
-    saveto=FOLDER
-        Path to the folder where impositions of the queried structure will  
-        be saved. If the folder does not exist, it will be created.
+# Time & memory usage
 
-    saveres=STRING
-        List of specifying the residues of the queried structure ARTEM  
-        will save. By default the value of qres is used.
-        See res options format below.
-
-    rmsdmin=FLOAT, rmsdmax=FLOAT, sizemin=FLOAT, sizemax=FLOAT,  
-    rmsdsizemin=FLOAT, rmsdsizemax=FLOAT, matchrange=FLOAT  
-        Thresholds for RMSD (rmsdmin, rmsdmax), SIZE (sizemin, sizemax),  
-        RMSD/SIZE (rmsdsizemin, rmsdsizemax), and the maximal range for  
-        mutually closest residues (matchrange). All the min/max parameters  
-        (except matchrange) define which superpositions will be printed to  
-        stdout (and saved to the saveto folder).  
-        The defaults:
-            rmsdmin     = 0.
-            rmsdmax     = 1e10
-            sizemin     = 1.
-            sizemax     = 1e10
-            rmsdsizemin = 0.
-            rmsdsizemax = 1e10
-            matchrange  = 3.
-
-    rformat=KEYWORD, qformat=KEYWORD, saveformat=KEYWORD
-        Formats of the input reference structure (rformat), query structure  
-        (qformat), and the output superpositions to be saved (saveformat).  
-        By default rformat and qformat are set to PDB, saveformat by default  
-        is set to be equal to qformat. When specified and equal to "pdb"  
-        (case-insensitive) - ARTEM set it to "PDB", when equal to "cif" or  
-        "mmcif" (case-insensitive) - ARTEM set it to "CIF", otherwise raise  
-        an error.
-
-    threads=INT
-        Number of CPUs to use. 1 by default. ARTEM multiprocessing is  
-        available only for UNIX-like systems.
-
-    ***
-    res options format
-
-    [#[INT]][/[STRING]][:[STRING][_INT[CHAR|_INT]]
-    
-        #[INT]
-            Reference/query structure model number. If not specified, the 
-             default is the first model #1. If an empty # number is specified,  
-             all models of the structure are used.
-        /[STRING]
-            Chain label
-        :[STRING][_INT[CHAR|_INT]
-            Range and/or types of residues
-            :STRING
-                to determine the residues with a specified type (e.g. ':A', ':G' etc.)
-            :_INT[CHAR]
-                to determine the residue with the specified index INT and  
-                the specified type CHAR
-            :_INT_INT
-                to determine the residues with indexes in a given range
-
-
-
-# Requirements
-numpy==1.22.3  
-pandas==1.4.2  
-scipy==1.8.1  
-
-# Time & Memory usage
 The implementation with default parameters takes around one minute to run an entire 5,970-residue eukaryotic ribosome (PDB entry 7O7Y) against a 160-residue TPP riboswitch (PDB entry 2GDI) on 32 cores, taking under 2Gb RAM at peak on an AMD Ryzen 9 5950X machine with 128Gb RAM. On the same machine on 32 cores a run of a 2,828-residue LSU rRNA (PDB entry 1FFK) against itself requires 20 minutes in time and 70Gb of RAM.
+
+# Usage 
+
+    python3 artem.py r=FILENAME q=FILENAME [OPTIONS]
+
+# Usage examples
+
+    1) python3 artem.py r=examples/1ivs.cif  q=examples/1wz2.cif rres=/C qres=/C > output.txt
+    
+    This command will write into "output.txt" file a sorted list of all local 
+    structural superpositions between the C chains of 1IVS and 1WZ2 PDB entries 
+    that are two tRNAs. The user can spot the three largest mathings of size 52. 
+    Then the user can save the largest mathings only into "result" folder in 
+    PDB format:
+    
+    python3 artem.py r=examples/1ivs.cif  q=examples/1wz2.cif rres=/C qres=/C sizemin=52 saveto=result saveformat=pdb
+    
+    As the result three files of three different matchings of 52 residues will 
+    be saved in PDB format - 1wz2_1.pdb, 1wz2_2.pdb, 1wz2_3.pdb. The latter is
+    the superposition with the best RMSD. Each of the saved files lists three 
+    structural models. The first model contains all "qres" residues 
+    superimposed with the reference structure. The second model contains 
+    the subset of the reference structure residues that were used 
+    for the superposition, and the third model stores their counterpart 
+    residues from the query structure. Then, the user can open the reference 
+    file 1ivs.cif together with the first model of the file 1wz2_3.pdb in a 3D
+    visualization tool for visual examination of the best local superposition 
+    of the two structures. The user can observe a good superposition 
+    of the four standard tRNA helical regions.
+    
+    2) python3 artem.py r=examples/motif10.pdb  q=examples/motif9.pdb rmsdsizemax=0.25
+    
+    This command will output a sorted list of those local structural 
+    superpositions between the two topologically different motifs of 
+    10 and 9 residues respectively that have a ration RMSD/SIZE under 0.25.
+    The user can spot the only mathing of size 8 with RMSD of 1.713 angstroms.
+    Then the user can save the superposition into "result" folder 
+    in CIF format:
+    
+    python3 artem.py r=examples/motif10.pdb  q=examples/motif9.pdb rmsdsizemax=0.25 sizemin=8 saveto=result saveformat=cif 
+    
+    The only file will be saved named "motif9_1.cif". Then, the user 
+    can open the reference file motif10.pdb together with the file 
+    motif9_1.cif in a 3D visualization tool for visual examination. 
+    The user can observe a good superposition of all the three stacked 
+    base pairs. Simultaneously, two of the three A-minor-forming 
+    adenosines have a counterpart residue.
+
+# Options 
+
+    r=FILENAME [REQUIRED OPTION]
+        Path to a reference structure in PDB/mmCIF format. For faster 
+        performance, it's advised to specify the largest of the two structures 
+        as the reference structure.
+
+    q=FILENAME [REQUIRED OPTION]
+        Path to a query structure, the one that ARTEM superimposes to 
+        the reference, in PDB/mmCIF format.
+
+    matchrange=FLOAT [DEFAULT: matchrange=3.0]
+    	The threshold used for searching the mutually closest residues. Only 
+    	those pairs of residues that have their centers of mass at a distance 
+    	under the specified matchrange value can be added to the subset 
+    	of the mutually closest residues. The higher matchrange value 
+    	will produce more "noisy" matchings but won't miss anything. The lower 
+    	matchrange value will produce more "clean" matchings but 
+    	can miss something.
+
+    rformat=KEYWORD, qformat=KEYWORD [DEFAULT: rformat=PDB,qformat=PDB] 
+        The specification of the input coordinate file formats 
+        (case-insensitive). By default, ARTEM tries to infer the format 
+        from the extensions of the input filenames. ".pdb", ".cif", 
+        and ".mmcif" formats can be recognized (case-insensitive). In the case 
+        of any other extension ARTEM will treat the file as the PDB-format 
+        file by default. If the "rformat" ("qformat") parameter is specified 
+        and it's either "PDB", "CIF", or "MMCIF" (case-insensitive), 
+        ARTEM will treat the reference (query) coordinate file
+        as the specified format.
+
+    rmsdmin=FLOAT, rmsdmax=FLOAT [DEFAULT: rmsdmin=0,rmsdmax=1e10]
+    	The specification of minimum and maximum RMSD thresholds. 
+    	ARTEM will print and save only the superpositions that satisfy 
+    	the specified thresholds. 
+    	
+    rmsdsizemin=FLOAT, rmsdsizemax=FLOAT [DEFAULT: rmsdsizemin=0,rmsdsizemax=1e10]
+        The specification of minimum and maximum RMSD/SIZE ratio thresholds. 
+        ARTEM will print and save only the superpositions that satisfy 
+        the specified thresholds. 
+
+    rres=STRING, qres=STRING [DEFAULT: rres="#1",qres="#1"]
+        The specification of the input reference (rres) and query (qres) 
+        structures. Only the specified residues will considered as part 
+        of the structure and all the other residues will be ignored. 
+        See the format description at the end of the OPTIONS section.
+
+    rresneg=STRING, qresneg=STRING [DEFAULT: None]
+    	The specification of the input reference (rresneg) and query (qresneg) 
+    	structures. The specified residues will be ignored and all the other 
+    	residues considered as part of the structure. If both "rres" 
+    	and "rresneg" (or "qres" and "qresneg") are specified simultaneusly, 
+    	ARTEM will ignore "rres" ("qres") and consider only "rresneg" 
+    	("qresneg").
+        See the format description at the end of the OPTIONS section.
+
+    rseed=STRING, qseed=STRING [DEFAULT: rseed=rres,qseed=qres]
+        The specification of the reference and query residues that ARTEM can use
+        for single-residue matching seeds.
+        See the format description at the end of the OPTIONS section.
+
+    saveformat=KEYWORD [DEFAULT: saveformat=qformat]
+        The specification of the format of the output coordinate files. 
+        By default, ARTEM will save the coordinate files in the same format 
+        as the query input file. If the "saveformat" parameter is specified 
+        and it's either "PDB", "CIF", or "MMCIF" (case-insensitive), ARTEM 
+        will save the output coordinate files in the specified format.
+
+    saveres=STRING [DEFAULT: saveres=qres]
+    	The specification of the query structure residues that will be saved 
+    	in the output coordinate files.
+        See the format description at the end of the OPTIONS section.
+
+    saveto=FOLDER [DEFAULT: None]
+        Path to the output folder to save the coordinate files 
+        of the superimposed query structures along with the mutually 
+        closest residue subsets. If the specified folder does not exist, 
+        ARTEM will create it. If the folder is not specified, 
+        nothing will be saved.
+
+    sizemin=FLOAT, sizemax=FLOAT [DEFAULT: sizemin=1,sizemax=1e10]
+        The specification of minimum and maximum SIZE thresholds. 
+        ARTEM will print and save only the superpositions that satisfy 
+        the specified thresholds. If sizemin is set to zero, ARTEM will 
+        output the dummy 0-size superpositions matching the reference 
+        and query residues lacking the 5-atom representation specified. 
+        The user can specify custom atom representations of any residues 
+        via editing the lib/nar.py text file.
+    
+    threads=INT [DEFAULT: threads=1]
+        Number of CPUs to use. ARTEM multiprocessing is available only for 
+        UNIX-like systems.
+
+    ***********************************************************************
+    ARTEM uses a ChimeraX-like format to specify the residues of interest 
+    using the "res" parameters:
+
+    [#[INT]][/[STRING]][:[STRING][_INT[CHAR|_INT]] - The structure specification
+                                                     format. The "res" 
+                                                     parameters can be defined 
+                                                     with a number 
+                                                     of specifications 
+                                                     separated by spaces and 
+                                                     enclosed in double quotes.
+
+        #[INT]                    == Model number
+        /[STRING]                 == Chain identifier
+        :[STRING][_INT[CHAR|_INT] == Residue(s) specification:
+            
+            :STRING     == Residue type    
+            :_INT[CHAR] == Residue number [with insertion code]
+            :_INT_INT   == Range of residue numbers
+            
+    Structure specification examples:
+        
+        rres="#1/B:_-10_20 #1/A"    - Consider the entire chain A from model 1 
+                                      and the range of chain B residues with 
+                                      numbers from -10 to 20 from model 1 as 
+                                      the reference structure.
+	qres="#"                    - Consider all the residues from all 
+	                              the models in the "q" file as 
+	                              the query structure.
+	saveres="/C:_10_20 /C:_20A" - Save the chain C residues with numbers 
+	                              from 10 to 20 and the chain C residue 
+	                              with number 20A (A is the insertion code).
+	rseed=:A                    - Use only the model 1 adenosines as the 
+	                              single-residue seeds from the reference 
+	                              structure. 
 
 # Contacts
 
-David Bogdan  
-*e-mail: bogdan.d@phystech.edu*  
+David Bogdan 
+*e-mail: bogdan.d@phystech.edu* 
