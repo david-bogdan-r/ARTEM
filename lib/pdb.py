@@ -220,8 +220,10 @@ class Structure:
                 rng[1] = int(rng[1])
                 rng[2] = int(rng[2])
             elif len(rng) == 2:
-                if rng[1].isdigit():
+                try:
                     rng[1] = int(rng[1])
+                except:
+                    pass
             spl[':'] = rng
         
         return spl
