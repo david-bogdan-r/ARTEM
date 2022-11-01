@@ -240,13 +240,13 @@ class Structure:
             if mod:
                 mod_mask = tab['pdbx_PDB_model_num'].eq(mod)
             else:
-                mod_mask = tab['pdbx_PDB_model_num'].astype(bool)
+                mod_mask = tab['group_PDB'].astype(bool)
             
             chn = spl['/']
             if chn:
                 chn_mask = tab['auth_asym_id'].eq(chn)
             else:
-                chn_mask = tab['auth_asym_id'].astype(bool)
+                chn_mask = tab['group_PDB'].astype(bool)
             
             rng  = spl[':']
             if rng:
@@ -256,7 +256,7 @@ class Structure:
             
             # res wo ':'
             if case == 0:
-                rng_mask = tab['auth_seq_id'].astype(bool)
+                rng_mask = tab['group_PDB'].astype(bool)
         
             # ':N'
             elif case == 1:
@@ -264,7 +264,7 @@ class Structure:
                 if res:
                     rng_mask = tab['auth_comp_id'].eq(rng[0])
                 else:
-                    rng_mask = tab['auth_comp_id'].astype(bool)
+                    rng_mask = tab['group_PDB'].astype(bool)
             
             #':_num' | ':_numN' | ':N_num' | ':N1_numN2'
             elif case == 2:
@@ -299,7 +299,7 @@ class Structure:
             
             # incorrect res
             else:
-                rng_mask = tab['auth_seq_id'].astype(bool) ^ True
+                rng_mask = tab['group_PDB'].astype(bool) ^ True
         
             mask |= mod_mask & chn_mask & rng_mask
         
