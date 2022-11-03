@@ -6,8 +6,6 @@
 
 [D.R. Bohdan, V.V. Voronina, J.M. Bujnicki, E.F. Baulin (2022) A comprehensive survey of long-range tertiary interactions and motifs in non-coding RNA structures. bioRxiv. DOI: 10.1101/2022.11.01.514747](https://doi.org/10.1101/2022.11.01.514747)
 
-https://github.com/febos/LORA/blob/...
-
 # Check out our [LORA dataset](https://github.com/febos/LORA)
 
 # How ARTEM works
