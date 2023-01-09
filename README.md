@@ -114,6 +114,14 @@ The implementation with default parameters takes around one minute to run an ent
     	will produce more "noisy" matchings but won't miss anything. The lower 
     	matchrange value will produce more "clean" matchings but 
     	can miss something.
+    	
+    maxresrmsd=FLOAT [DEFAULT: maxresrmsd=None]
+    	The specification of maximum per-residue RMSD threshold. 
+    	When specified, for each subset of mutually closest residues ARTEM will 
+    	iteratively remove residues with the worst per-residue RMSD from the 
+    	subset one by one with the following re-superpositioning based on the 
+    	remaining residues of the subset until the specified threshold is met
+    	or the subset is empty. 
 
     rformat=KEYWORD, qformat=KEYWORD [DEFAULT: rformat=PDB,qformat=PDB] 
         The specification of the input coordinate file formats 
