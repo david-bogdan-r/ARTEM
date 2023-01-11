@@ -114,14 +114,6 @@ The implementation with default parameters takes around one minute to run an ent
     	will produce more "noisy" matchings but won't miss anything. The lower 
     	matchrange value will produce more "clean" matchings but 
     	can miss something.
-    	
-    maxresrmsd=FLOAT [DEFAULT: maxresrmsd=None]
-    	The specification of maximum per-residue RMSD threshold. 
-    	When specified, for each subset of mutually closest residues ARTEM will 
-    	iteratively remove residues with the worst per-residue RMSD from the 
-    	subset one by one with the following re-superpositioning based on the 
-    	remaining residues of the subset until the specified threshold is met
-    	or the subset is empty. 
 
     rformat=KEYWORD, qformat=KEYWORD [DEFAULT: rformat=PDB,qformat=PDB] 
         The specification of the input coordinate file formats 
@@ -143,6 +135,11 @@ The implementation with default parameters takes around one minute to run an ent
         The specification of minimum and maximum RMSD/SIZE ratio thresholds. 
         ARTEM will print and save only the superpositions that satisfy 
         the specified thresholds. 
+
+    resrmsdmin=FLOAT, resrmsdmax=FLOAT [DEFAULT: resrmsdmin=0, resrmsdmax=1e10]
+    	The specification of minimum and maximum per-residue RMSD threshold.
+    	ARTEM will print and save only the superpositions that satisfy 
+    	the specified thresholds.
 
     rres=STRING, qres=STRING [DEFAULT: rres="#1",qres="#1"]
         The specification of the input reference (rres) and query (qres) 
@@ -191,7 +188,14 @@ The implementation with default parameters takes around one minute to run an ent
         and query residues lacking the 5-atom representation specified. 
         The user can specify custom atom representations of any residues 
         via editing the lib/nar.py text file.
-    
+
+    trim=BOOL [DEFAULT: trim=None]
+    	When specified, for each subset of mutually closest residues ARTEM will 
+    	iteratively remove residues with the worst per-residue RMSD from the 
+    	subset one by one with the following re-superpositioning based on the 
+    	remaining residues of the subset until the specified thresholds for rmsdmax,
+    	rmsdsizemax, resrmsdmax are reached or the subset size is less than sizemin.
+
     threads=INT [DEFAULT: threads=1]
         Number of CPUs to use. ARTEM multiprocessing is available only for 
         UNIX-like systems.
