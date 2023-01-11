@@ -482,9 +482,9 @@ if  __name__ == '__main__':
         
         delta   = 15 * threads
         cnt     = 0
-        cnt_max = len(indx_pairs)
+        cnt_max = len(r_ind) * len(q_ind)
         while cnt < cnt_max:
-            inp = (next(indx_pairs) for _ in range(delta))
+            inp = [next(indx_pairs) for _ in range(delta)]
             for p, out in zip(inp, pool.starmap(artem, inp)):
                 if out:
                     m, n = p
