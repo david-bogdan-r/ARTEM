@@ -192,7 +192,17 @@ def artem(m, n):
                 size -= 1
                 continue
             
+            
             if size > sizemax:
+                return None
+            
+            if resrmsd < resrmsdmin:
+                return None
+            
+            if rmsd < rmsdmin:
+                return None
+            
+            if rmsdsize < rmsdsizemin:
                 return None
             
             break
@@ -490,9 +500,9 @@ if  __name__ == '__main__':
     
     if sizemin <= 0:
         for npc in rseed_npc:
-            tabrows.append((None, 0, None, None, npc, None))
+            tabrows.append((None, 0, None, None, None, npc, None))
         for npc in qseed_npc:
-            tabrows.append((None, 0, None, None, None, npc))
+            tabrows.append((None, 0, None, None, None, None, npc))
     
     for k, v in items:
         size = len(k) - 2
