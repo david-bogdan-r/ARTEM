@@ -7,27 +7,25 @@ import numpy  as np
 import multiprocessing as mp
 
 from scipy.spatial import KDTree
+
 from lib.pdb import Structure, parser
 from lib.nar import seed_res_repr
 
-
-# ignore SettingWithCopyWarning
 pd.set_option('mode.chained_assignment', None)
-
-
-# Defaults
 
 rres    = '#1'
 qres    = '#1'
 rresneg = ''
 qresneg = ''
 
-rmsdmin     = 0.
-rmsdmax     = 1e10
 sizemin     = 1.
 sizemax     = 1e10
+rmsdmin     = 0.
+rmsdmax     = 1e10
 rmsdsizemin = 0.
 rmsdsizemax = 1e10
+resrmsdmin  = 0.
+resrmsdmax  = 1e10
 matchrange  = 3.
 
 saveto  = ''
@@ -35,23 +33,14 @@ saveres = ''
 
 threads = 1
 
-keep = 'last'   # keep alternative atom locations: 'first', 'last', False
+trim = False
+
+keep = 'last'
 
 help_args = {'--H', '-H', '--h', '-h', '--help', '-help'}
 
-# Functions
 
 def get_transform(X:'np.ndarray', Y:'np.ndarray'):
-    '''
-    Returns a linear operator minimizing the RMSD between matrix X and Y.
-    
-    Input:
-        X - N x 3 np.ndarray matrix
-        Y - N x 3 np.ndarray matrix
-    Output:
-        A - 3 x 3 rotation np.ndarray matrix
-        B - 3 - bias np.ndarray vector 
-    '''
     X_avg = X.mean(axis=0)
     Y_avg = Y.mean(axis=0)
     
@@ -152,38 +141,96 @@ def describe(struct: 'Structure'):
     
     return data, noise
 
+
 def artem(m, n):
-    prim_transform  = get_transform(r_prim[m], q_prim[n])
+    transform  = get_transform(r_prim[m], q_prim[n])
     
-    q_avg_tree = KDTree(apply_transform(q_avg, prim_transform))
+    q_avg_tree = KDTree(apply_transform(q_avg, transform))
     dist = r_avg_tree.sparse_distance_matrix(
         q_avg_tree,
         matchrange,
         p=2,
         output_type='ndarray'
     )
-
+    
     neighbors = mutual_nearest_neighbors(dist)
-    size = len(neighbors)
-    if not sizemin <= size <= sizemax:
-        return None
+    size      = len(neighbors)
     
-    X, Y = vstack([[r_scnd[i], q_scnd[j]] for i, j in neighbors])
-    scnd_transform = get_transform(X, Y)
+    if trim:
+        while size >= sizemin:
+            X, Y = vstack([[r_scnd[i], q_scnd[j]] for i, j in neighbors])
+            transform = get_transform(X, Y)
+            
+            resrmsd = np.array(
+                [
+                    RMSD(
+                        r_eval[i], 
+                        apply_transform(q_eval[j], transform)
+                    )
+                    for i, j in neighbors
+                ]
+            )
+            argmax  = resrmsd.argmax()
+            resrmsd = resrmsd[argmax]
+            
+            if resrmsd > resrmsdmax:
+                neighbors.pop(argmax)
+                size -= 1
+                continue
+            
+            X, Y = vstack([[r_eval[i], q_eval[j]] for i, j in neighbors])
+            
+            rmsd = RMSD(X, apply_transform(Y, transform))
+            if rmsd > rmsdmax:
+                neighbors.pop(argmax)
+                size -= 1
+                continue
+            
+            rmsdsize = rmsd / size 
+            if rmsdsize > rmsdsizemax:
+                neighbors.pop(argmax)
+                size -= 1
+                continue
+            
+            if size > sizemax:
+                return None
+            
+            break
+        else:
+            return None
     
-    X, Y = vstack([[r_eval[i], q_eval[j]] for i, j in neighbors])
-    
-    rmsd = RMSD(X, apply_transform(Y, scnd_transform))
-    if not rmsdmin <= rmsd <= rmsdmax:
-        return None
-    
-    rmsdsize = rmsd / size
-    if not rmsdsizemin <= rmsdsize <= rmsdsizemax:
-        return None
-    
+    else:
+        if not sizemin <= size <= sizemax:
+            return None
+        
+        X, Y = vstack([[r_scnd[i], q_scnd[j]] for i, j in neighbors])
+        transform = get_transform(X, Y)
+        
+        X, Y = vstack([[r_eval[i], q_eval[j]] for i, j in neighbors])
+        
+        rmsd = RMSD(X, apply_transform(Y, transform))
+        if not rmsdmin <= rmsd <= rmsdmax:
+            return None
+        
+        rmsdsize = rmsd / size
+        if not rmsdsizemin <= rmsdsize <= rmsdsizemax:
+            return None
+        
+        resrmsd = max(
+            [
+                RMSD(
+                    r_eval[i], 
+                    apply_transform(q_eval[j], transform)
+                )
+                for i, j in neighbors
+            ]
+        )
+        if not resrmsdmin <= resrmsd <= resrmsdmax:
+            return None
     
     neighbors = sorted([i*q_count + j for i, j in neighbors])
-    neighbors.append(round(rmsd, 3))
+    neighbors.extend([round(rmsd, 3), round(resrmsd, 3)])
+    
     return tuple(neighbors)
 
 
@@ -238,8 +285,6 @@ def save_superimpose(superimpose:'pd.Series') -> 'None':
 
 if  __name__ == '__main__':
     
-    # Processing inputs
-    
     argv = sys.argv[1:]
     if any([arg in help_args for arg in argv]):
         with open('help.txt', 'r') as helper:
@@ -249,9 +294,8 @@ if  __name__ == '__main__':
         kwargs = dict([arg.split('=') for arg in argv])
     
     threads = int(kwargs.get('threads', threads))
+    
     if threads != 1:
-        # ARTEM multiprocessing is available only for UNIX-like systems
-        
         mp.set_start_method('fork')
         if threads <= 0:
             threads = mp.cpu_count()
@@ -302,6 +346,9 @@ if  __name__ == '__main__':
     sizemin     = float(kwargs.get('sizemin', sizemin))
     sizemax     = float(kwargs.get('sizemax', sizemax))
     
+    resrmsdmin  = float(kwargs.get('resrmsdmin', resrmsdmin))
+    resrmsdmax  = float(kwargs.get('resrmsdmax', resrmsdmax))
+    
     rmsdmin     = float(kwargs.get('rmsdmin', rmsdmin))
     rmsdmax     = float(kwargs.get('rmsdmax', rmsdmax))
     
@@ -310,8 +357,9 @@ if  __name__ == '__main__':
     
     matchrange  = float(kwargs.get('matchrange', matchrange))
     
-    
-    # Model preprocessing
+    trim    = bool(kwargs.get('trim', trim))
+    if trim:
+        sizemin = max(sizemin, 0)
     
     rstruct  = parser(r, rformat, rname)
     rstruct.drop_duplicates_alt_id(keep=keep)
@@ -387,8 +435,6 @@ if  __name__ == '__main__':
     q_ind = [i for i, code in enumerate(q_code) if code in qseed_code]
     q_count = len(q_code)
     
-    
-    # Preparing a saved structure
     saveto = kwargs.get('saveto', saveto)
     if saveto:
         os.makedirs(saveto, exist_ok=True)
@@ -409,10 +455,8 @@ if  __name__ == '__main__':
             else:
                 ssmask = qstruct.get_res_mask(qres)
     
-    
-    # ARTEM Computations 
     result     = {}
-    indx_pairs = list(itertools.product(r_ind, q_ind))
+    indx_pairs = itertools.product(r_ind, q_ind)
     r_avg_tree = KDTree(r_avg)
     if threads == 1:
         inp = indx_pairs
@@ -430,7 +474,7 @@ if  __name__ == '__main__':
         cnt     = 0
         cnt_max = len(indx_pairs)
         while cnt < cnt_max:
-            inp = indx_pairs[cnt:cnt + delta]
+            inp = (next(indx_pairs) for _ in range(delta))
             for p, out in zip(inp, pool.starmap(artem, inp)):
                 if out:
                     m, n = p
@@ -442,8 +486,6 @@ if  __name__ == '__main__':
     items = result.items()
     del result
     
-    # Output
-    
     tabrows = []
     
     if sizemin <= 0:
@@ -453,8 +495,9 @@ if  __name__ == '__main__':
             tabrows.append((None, 0, None, None, None, npc))
     
     for k, v in items:
-        size = len(k) - 1
-        rmsd = k[-1]
+        size = len(k) - 2
+        rmsd = k[-2]
+        resrmsd = k[-1]
         rmsdsize = rmsd / size
 
         prim = ','.join(
@@ -466,13 +509,13 @@ if  __name__ == '__main__':
         scnd = ','.join(
             [
                 '='.join([r_code[s // q_count], q_code[s % q_count]])
-                for s in k[:-1]
+                for s in k[:-2]
             ]
         )
         
-        tabrows.append((k[:-1], size, rmsd, rmsdsize, prim, scnd))
+        tabrows.append((k[:-2], size, rmsd, rmsdsize, resrmsd, prim, scnd))
     
-    columns = ['neighbors', 'SIZE', 'RMSD', 'RMSDSIZE', 'PRIM', 'SCND']
+    columns = ['neighbors', 'SIZE', 'RMSD', 'RMSDSIZE', 'RESRMSD', 'PRIM', 'SCND']
     tab = pd.DataFrame(tabrows, columns=columns)
     tab.sort_values(
         ['SIZE', 'RMSDSIZE'], 
@@ -484,7 +527,7 @@ if  __name__ == '__main__':
     
     tab.to_csv(
         sys.stdout,
-        columns=['SIZE', 'RMSD', 'RMSDSIZE', 'PRIM', 'SCND'],
+        columns=['SIZE', 'RMSD', 'RMSDSIZE', 'RESRMSD', 'PRIM', 'SCND'],
         sep='\t',
         float_format='{:0.3f}'.format,
     )
