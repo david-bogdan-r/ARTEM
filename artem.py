@@ -13,8 +13,6 @@ from lib.nar import seed_res_repr
 
 pd.set_option('mode.chained_assignment', None)
 
-ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
-
 rres    = '#1'
 qres    = '#1'
 rresneg = ''
@@ -146,7 +144,6 @@ def describe(struct: 'Structure'):
 
 def artem(m, n):
     transform  = get_transform(r_prim[m], q_prim[n])
-    
     q_avg_tree = KDTree(apply_transform(q_avg, transform))
     dist = r_avg_tree.sparse_distance_matrix(
         q_avg_tree,
@@ -299,7 +296,7 @@ if  __name__ == '__main__':
     
     argv = sys.argv[1:]
     if any([arg in help_args for arg in argv]):
-        with open(ROOT_DIR + '/help.txt', 'r') as helper:
+        with open('help.txt', 'r') as helper:
             print(helper.read())
         exit()
     else:
@@ -321,8 +318,7 @@ if  __name__ == '__main__':
     rneg    = bool(rresneg)
     rseed   = kwargs.get('rseed', '#')
     
-    folder, file = os.path.split(r)
-    rname, rext  = os.path.splitext(file)
+    rname, rext = r.split(os.sep)[-1].split('.')
     rext = rext.upper()
     rext = 'CIF' if rext == 'MMCIF' else rext
     
@@ -342,8 +338,7 @@ if  __name__ == '__main__':
     qneg    = bool(qresneg)
     qseed   = kwargs.get('qseed', '#')
     
-    folder, file = os.path.split(q)
-    qname, qext  = os.path.splitext(file)
+    qname, qext = q.split(os.sep)[-1].split('.')
     qext = qext.upper()
     qext = 'CIF' if qext == 'MMCIF' else qext
     
@@ -488,18 +483,15 @@ if  __name__ == '__main__':
         cnt     = 0
         cnt_max = len(r_ind) * len(q_ind)
         while cnt < cnt_max:
-            try:
-                inp = [next(indx_pairs) for _ in range(delta)]
-                for p, out in zip(inp, pool.starmap(artem, inp)):
-                    if out:
-                        m, n = p
-                        if out in result:
-                            result[out].append(m*q_count + n)
-                        else:
-                            result[out] = [m*q_count + n]
-                cnt += delta
-            except StopIteration:
-                break
+            inp = [next(indx_pairs) for _ in range(min(cnt_max-cnt,delta))]
+            for p, out in zip(inp, pool.starmap(artem, inp)):
+                if out:
+                    m, n = p
+                    if out in result:
+                        result[out].append(m*q_count + n)
+                    else:
+                        result[out] = [m*q_count + n]
+            cnt += delta
     items = result.items()
     del result
     
