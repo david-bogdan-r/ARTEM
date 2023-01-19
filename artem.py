@@ -488,15 +488,18 @@ if  __name__ == '__main__':
         cnt     = 0
         cnt_max = len(r_ind) * len(q_ind)
         while cnt < cnt_max:
-            inp = [next(indx_pairs) for _ in range(delta)]
-            for p, out in zip(inp, pool.starmap(artem, inp)):
-                if out:
-                    m, n = p
-                    if out in result:
-                        result[out].append(m*q_count + n)
-                    else:
-                        result[out] = [m*q_count + n]
-            cnt += delta
+            try:
+                inp = [next(indx_pairs) for _ in range(delta)]
+                for p, out in zip(inp, pool.starmap(artem, inp)):
+                    if out:
+                        m, n = p
+                        if out in result:
+                            result[out].append(m*q_count + n)
+                        else:
+                            result[out] = [m*q_count + n]
+                cnt += delta
+            except StopIteration:
+                pass
     items = result.items()
     del result
     
