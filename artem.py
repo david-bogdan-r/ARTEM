@@ -11,6 +11,8 @@ from scipy.spatial import KDTree
 from lib.pdb import Structure, parser
 from lib.nar import seed_res_repr
 
+ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
+
 pd.set_option('mode.chained_assignment', None)
 
 rres    = '#1'
@@ -296,7 +298,7 @@ if  __name__ == '__main__':
     
     argv = sys.argv[1:]
     if any([arg in help_args for arg in argv]):
-        with open('help.txt', 'r') as helper:
+        with open(ROOT_DIR + '/help.txt', 'r') as helper:
             print(helper.read())
         exit()
     else:
@@ -318,7 +320,8 @@ if  __name__ == '__main__':
     rneg    = bool(rresneg)
     rseed   = kwargs.get('rseed', '#')
     
-    rname, rext = r.split(os.sep)[-1].split('.')
+    folder, file = os.path.split(r)
+    rname, rext  = os.path.splitext(file)
     rext = rext.upper()
     rext = 'CIF' if rext == 'MMCIF' else rext
     
@@ -338,7 +341,9 @@ if  __name__ == '__main__':
     qneg    = bool(qresneg)
     qseed   = kwargs.get('qseed', '#')
     
-    qname, qext = q.split(os.sep)[-1].split('.')
+    
+    folder, file = os.path.split(q)
+    qname, qext  = os.path.splitext(file)
     qext = qext.upper()
     qext = 'CIF' if qext == 'MMCIF' else qext
     
