@@ -499,7 +499,7 @@ if  __name__ == '__main__':
                             result[out] = [m*q_count + n]
                 cnt += delta
             except StopIteration:
-                pass
+                break
     items = result.items()
     del result
     
