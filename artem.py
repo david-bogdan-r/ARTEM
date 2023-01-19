@@ -13,6 +13,8 @@ from lib.nar import seed_res_repr
 
 pd.set_option('mode.chained_assignment', None)
 
+ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
+
 rres    = '#1'
 qres    = '#1'
 rresneg = ''
@@ -297,7 +299,7 @@ if  __name__ == '__main__':
     
     argv = sys.argv[1:]
     if any([arg in help_args for arg in argv]):
-        with open('help.txt', 'r') as helper:
+        with open(ROOT_DIR + '/help.txt', 'r') as helper:
             print(helper.read())
         exit()
     else:
