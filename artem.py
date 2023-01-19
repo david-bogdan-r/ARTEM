@@ -473,7 +473,7 @@ if  __name__ == '__main__':
     indx_pairs = itertools.product(r_ind, q_ind)
     r_avg_tree = KDTree(r_avg)
     if threads == 1:
-        inp = indx_pairs
+        inp = list(indx_pairs)
         for p, out in zip(inp, (artem(m, n) for m, n in inp)):
             if out:
                 m, n = p 
