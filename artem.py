@@ -319,7 +319,8 @@ if  __name__ == '__main__':
     rneg    = bool(rresneg)
     rseed   = kwargs.get('rseed', '#')
     
-    rname, rext = r.split(os.sep)[-1].split('.')
+    folder, file = os.path.split(r)
+    rname, rext  = os.path.splitext(file)
     rext = rext.upper()
     rext = 'CIF' if rext == 'MMCIF' else rext
     
@@ -339,7 +340,8 @@ if  __name__ == '__main__':
     qneg    = bool(qresneg)
     qseed   = kwargs.get('qseed', '#')
     
-    qname, qext = q.split(os.sep)[-1].split('.')
+    folder, file = os.path.split(q)
+    qname, qext  = os.path.splitext(file)
     qext = qext.upper()
     qext = 'CIF' if qext == 'MMCIF' else qext
     
