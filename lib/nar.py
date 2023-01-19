@@ -67,10 +67,10 @@ _3_atomic_representation = {
 }
 
 seed_res_repr = (
-    _5_atomic_representation,
-    _5_atomic_representation,
-    _3_atomic_representation,
-    _3_atomic_representation,
+    _5_atomic_representation, # For primary alignment
+    _5_atomic_representation, # To calculate centers of mass
+    _3_atomic_representation, # For secondary alignment
+    _3_atomic_representation, # To calculate RMSD
 )
 
 prepared = []
