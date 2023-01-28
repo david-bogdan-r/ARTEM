@@ -415,27 +415,27 @@ class Structure:
 
 
 def parser(path:'str', fmt:'str' = 'PDB', name:'str' = '') -> 'Structure':
-    if fmt == 'PDB':
-        columns = (
-            'group_PDB',
-            'id',
-            'auth_atom_id',
-            'label_alt_id',
-            'auth_comp_id',
-            'auth_asym_id',
-            'auth_seq_id',
-            'pdbx_PDB_ins_code',
-            'Cartn_x',
-            'Cartn_y',
-            'Cartn_z',
-            'occupancy',
-            'B_iso_or_equiv',
-            'type_symbol',
-            'pdbx_formal_charge',
-            
-            'pdbx_PDB_model_num',   # extra column for the atomic coordinate table
-        )
+    pdb_columns = (
+        'group_PDB',
+        'id',
+        'auth_atom_id',
+        'label_alt_id',
+        'auth_comp_id',
+        'auth_asym_id',
+        'auth_seq_id',
+        'pdbx_PDB_ins_code',
+        'Cartn_x',
+        'Cartn_y',
+        'Cartn_z',
+        'occupancy',
+        'B_iso_or_equiv',
+        'type_symbol',
+        'pdbx_formal_charge',
         
+        'pdbx_PDB_model_num',   # extra column for the atomic coordinate table
+    )
+    
+    if fmt == 'PDB':
         rec_names = {'ATOM  ', 'HETATM'}
         
         cur_model = 1
@@ -473,7 +473,7 @@ def parser(path:'str', fmt:'str' = 'PDB', name:'str' = '') -> 'Structure':
                 cur_model = int(line.split()[1])
         file.close()
         
-        tab = pd.DataFrame(items, columns=columns)
+        tab = pd.DataFrame(items, columns=pdb_columns)
         tab = tab.apply(pd.to_numeric)
         tab.fillna('', inplace=True)
     
@@ -522,6 +522,11 @@ def parser(path:'str', fmt:'str' = 'PDB', name:'str' = '') -> 'Structure':
         l = lambda x: x[1:-1] if x.startswith('"') or x.startswith("'") else x
         tab['label_atom_id'] = list(map(l, tab['label_atom_id']))
         tab['auth_atom_id']  = list(map(l, tab['auth_atom_id']))
+        
+        for pdb_col in pdb_columns:
+            if pdb_col not in tab.columns:
+                tab[pdb_col] = '?'
+    
     
     struct = Structure(name)
     struct.set_tab(tab)
