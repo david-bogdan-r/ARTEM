@@ -322,7 +322,7 @@ if  __name__ == '__main__':
     
     folder, file = os.path.split(r)
     rname, rext  = os.path.splitext(file)
-    rext = rext.upper()
+    rext = rext[1:].upper()
     rext = 'CIF' if rext == 'MMCIF' else rext
     
     rformat = kwargs.get('rformat', '').upper()
@@ -344,7 +344,7 @@ if  __name__ == '__main__':
     
     folder, file = os.path.split(q)
     qname, qext  = os.path.splitext(file)
-    qext = qext.upper()
+    qext = qext[1:].upper()
     qext = 'CIF' if qext == 'MMCIF' else qext
     
     qformat = kwargs.get('qformat', '').upper()
