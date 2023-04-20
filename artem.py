@@ -35,8 +35,6 @@ saveres = ''
 
 threads = 1
 
-trim = False
-
 keep = 'last'
 
 help_args = {'--H', '-H', '--h', '-h', '--help', '-help'}
@@ -371,7 +369,15 @@ if  __name__ == '__main__':
     
     matchrange  = float(kwargs.get('matchrange', matchrange))
     
-    trim    = bool(kwargs.get('trim', trim))
+    if 'trim' in kwargs:
+        trim = kwargs['trim'].lower()
+        if trim == '0' or trim == 'false':
+            trim = False
+        else:
+            trim = True
+    else:
+        trim = False
+
     if trim:
         sizemin = max(sizemin, 0)
     
