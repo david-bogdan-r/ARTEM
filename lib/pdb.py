@@ -85,7 +85,7 @@ class Structure:
     
     def saveto(self, folder:'str', fmt:'str' = None) -> 'None':
         os.makedirs(folder, exist_ok=True)
-        tab  = self.tab
+        tab = self.tab.copy()
         
         if not fmt:
             fmt = self.fmt
@@ -104,6 +104,8 @@ class Structure:
                 tab.replace('?', '', inplace=True)
             else:
                 msg = []
+            
+            tab['auth_atom_id'] = tab['auth_atom_id'].apply(atom_id_PDBformat)
             
             text = ''.join(msg)
             for model_num, tt in tab.groupby('pdbx_PDB_model_num', sort=False):
@@ -535,8 +537,29 @@ def parser(path:'str', fmt:'str' = 'PDB', name:'str' = '') -> 'Structure':
     return struct
 
 
+def atom_id_PDBformat(atom:'str'):
+
+    if len(atom) == 0:
+        return '    '
+
+    if len(atom) == 4:
+        return atom
+
+    p1 = ''
+    p2 = ''
+    for c in atom:
+        if c.isalpha():
+            p1 += c
+        else:
+            p2 += c
+
+    ans = '{:>2}'.format(p1) + '{:<2}'.format(p2)
+
+    return ans
+
+
 # PDB save formats
-ATOM   = '{group_PDB:<6}{id:>5} {auth_atom_id:<4}{label_alt_id:1}{auth_comp_id:>3}{auth_asym_id:>2}{auth_seq_id:>4}{pdbx_PDB_ins_code:1}   {Cartn_x:>8.3f}{Cartn_y:>8.3f}{Cartn_z:>8.3f}{occupancy:>6.2f}{B_iso_or_equiv:>6.2f}          {type_symbol:>2}{pdbx_formal_charge:>2}\n'
+ATOM   = '{group_PDB:<6}{id:>5} {auth_atom_id:>4}{label_alt_id:1}{auth_comp_id:>3}{auth_asym_id:>2}{auth_seq_id:>4}{pdbx_PDB_ins_code:1}   {Cartn_x:>8.3f}{Cartn_y:>8.3f}{Cartn_z:>8.3f}{occupancy:>6.2f}{B_iso_or_equiv:>6.2f}          {type_symbol:>2}{pdbx_formal_charge:>2}\n'
 TER    = 'TER   {id:>5}      {auth_comp_id:>3}{auth_asym_id:>2}{auth_seq_id:>4}                                                      \n'
 MODEL  = 'MODEL     {:>4}                                                                  \n'
 REMARK = 'REMARK 250 CHAIN RENAMING {} -> {}'
