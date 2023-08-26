@@ -105,7 +105,7 @@ class Structure:
             else:
                 msg = []
             
-            tab['auth_atom_id'] = tab['auth_atom_id'].apply(atom_id_PDBformat)
+            tab['auth_atom_id'] = tab.apply(atom_id_PDBformat, axis=1)
             
             text = ''.join(msg)
             for model_num, tt in tab.groupby('pdbx_PDB_model_num', sort=False):
@@ -537,25 +537,21 @@ def parser(path:'str', fmt:'str' = 'PDB', name:'str' = '') -> 'Structure':
     return struct
 
 
-def atom_id_PDBformat(atom:'str'):
+def atom_id_PDBformat(atom:'pd.Series'):
 
-    if len(atom) == 0:
-        return '    '
+    type_symbol = atom['type_symbol']
+    atom_id     = atom['auth_atom_id']
 
-    if len(atom) == 4:
-        return atom
+    if len(atom_id) == 4:
+        return atom_id
 
-    p1 = ''
-    p2 = ''
-    for c in atom:
-        if c.isalpha():
-            p1 += c
-        else:
-            p2 += c
+    elif type_symbol:
+        suff = atom_id[len(type_symbol):]
 
-    ans = '{:>2}'.format(p1) + '{:<2}'.format(p2)
+        return '{:>2}'.format(type_symbol) + '{:<2}'.format(suff)
 
-    return ans
+    else:
+        return atom_id
 
 
 # PDB save formats
