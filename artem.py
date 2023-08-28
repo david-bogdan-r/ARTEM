@@ -33,7 +33,7 @@ matchrange  = 3.
 saveto  = ''
 saveres = ''
 
-threads = 1
+threads = mp.cpu_count()
 
 keep = 'last'
 
