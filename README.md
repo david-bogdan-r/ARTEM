@@ -196,7 +196,7 @@ The implementation with default parameters takes around one minute to run an ent
     	remaining residues of the subset until the specified thresholds for rmsdmax,
     	rmsdsizemax, resrmsdmax are reached or the subset size is less than sizemin.
 
-    threads=INT [DEFAULT: threads=1]
+    threads=INT [DEFAULT: threads= CPU COUNT]
         Number of CPUs to use. ARTEM multiprocessing is available only for 
         UNIX-like systems.
 
