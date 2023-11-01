@@ -232,7 +232,8 @@ class Structure:
     
     
     def get_res_mask(self, res:'str') -> 'pd.Series':
-        tab = self.tab
+        tab = self.tab.copy()
+        tab['auth_asym_id'] = tab['auth_asym_id'].astype(str)
         
         mask = tab['id'].astype(bool) ^ True
         for subres in res.split():
