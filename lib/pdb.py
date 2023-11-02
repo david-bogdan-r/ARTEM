@@ -233,7 +233,6 @@ class Structure:
     
     def get_res_mask(self, res:'str') -> 'pd.Series':
         tab = self.tab.copy()
-        tab['auth_asym_id'] = tab['auth_asym_id'].astype(str)
         
         mask = tab['id'].astype(bool) ^ True
         for subres in res.split():
@@ -530,6 +529,8 @@ def parser(path:'str', fmt:'str' = 'PDB', name:'str' = '') -> 'Structure':
             if pdb_col not in tab.columns:
                 tab[pdb_col] = '?'
     
+    tab['auth_comp_id'] = tab['auth_comp_id'].astype(str)
+    tab['auth_asym_id'] = tab['auth_asym_id'].astype(str)
     
     struct = Structure(name)
     struct.set_tab(tab)
