@@ -3,7 +3,7 @@ import os
 import pandas as pd 
 import numpy  as np
 
-pd.to_numeric.__defaults__ = 'ignore', None
+pd.to_numeric.__defaults__ = ('ignore',) + pd.to_numeric.__defaults__[1:]
 
 formats = {'PDB', 'CIF'}
 
