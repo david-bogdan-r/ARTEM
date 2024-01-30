@@ -4,9 +4,10 @@ import pandas as pd
 import numpy  as np
 
 pd.to_numeric.__defaults__ = ('ignore',) + pd.to_numeric.__defaults__[1:]
+pd.options.mode.chained_assignment = None
 
 formats = {'PDB', 'CIF'}
-
+URL = 'https://files.rcsb.org/view/{}{}'
 class Structure:
     count = 0
     
@@ -278,17 +279,19 @@ class Structure:
                     else:
                         rng_mask = tab['auth_seq_id'].eq(num)
                 else:
-                    # ':N1_numN2' = ':_numN2' even if N1 != N2
+                    # ':N1_numN2'
                     dgt = ''
                     for i, c in enumerate(num):
                         if c.isdigit():
                             dgt += c
                         else:
                             break
-                    res = num[i:]
+                    ins_code = num[i:]
                     num = int(dgt)
                     rng_mask = tab['auth_seq_id'].eq(num) \
-                        & tab['auth_comp_id'].eq(res)
+                        & tab['pdbx_PDB_ins_code'].eq(ins_code)
+                    if res:
+                        rng_mask &= tab['auth_comp_id'].eq(res)
             
             # ':_num1_num2' | ':N_num1_num2'
             elif case == 3:
@@ -416,7 +419,7 @@ class Structure:
 
 
 
-def parser(path:'str', fmt:'str' = 'PDB', name:'str' = '') -> 'Structure':
+def parser(path:'str'='', fmt:'str' = 'PDB', name:'str' = '') -> 'Structure':
     pdb_columns = (
         'group_PDB',
         'id',
@@ -436,14 +439,21 @@ def parser(path:'str', fmt:'str' = 'PDB', name:'str' = '') -> 'Structure':
         
         'pdbx_PDB_model_num',   # extra column for the atomic coordinate table
     )
-    
+
     if fmt == 'PDB':
         rec_names = {'ATOM  ', 'HETATM'}
         
         cur_model = 1
         items     = []
         
-        file = open(path, 'r')
+        if os.path.isfile(path):
+            file = open(path, 'r').readlines()
+        else:
+            if len(name) == 4:
+                import requests
+                url = URL.format(name.upper(), '.pdb')
+                file = requests.get(url).text.split('\n')
+
         for line in file:
             if line.startswith('_'):
                 raise Exception(
@@ -473,15 +483,20 @@ def parser(path:'str', fmt:'str' = 'PDB', name:'str' = '') -> 'Structure':
                 items.append(item)
             elif rec == 'MODEL ':
                 cur_model = int(line.split()[1])
-        file.close()
-        
+
         tab = pd.DataFrame(items, columns=pdb_columns)
-        tab = tab.apply(pd.to_numeric)
-        tab.fillna('', inplace=True)
-    
+        tab = tab.apply(pd.to_numeric).fillna('')
+
+
     elif fmt == 'CIF':
-        with open(path, 'r') as file:
-            text = file.read()
+        if os.path.isfile(path):
+            with open(path, 'r') as file:
+                text = file.read()
+        else:
+            if len(name) == 4:
+                import requests
+                url = URL.format(name.upper(), '.cif')
+                text = requests.get(url).text
         
         start = text.find('_atom_site.')
         if start == -1:
