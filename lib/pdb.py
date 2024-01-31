@@ -133,12 +133,24 @@ class Structure:
                 tab['label_atom_id']   = tab['auth_atom_id']
                 tab['label_comp_id']   = tab['auth_comp_id']
                 tab['label_asym_id']   = tab['auth_asym_id']
-                tab['label_seq_id']    = tab['auth_seq_id']
+                # tab['label_seq_id']    = tab['auth_seq_id']
                 
                 entity = tab['label_asym_id'].unique()
                 entity = dict(zip(entity, range(1, len(entity) + 1)))
                 tab['label_entity_id'] = tab['label_asym_id'].replace(entity)
                 
+                label_seq_id = tab[[
+                    'pdbx_PDB_model_num',
+                    'auth_asym_id', 
+                    'auth_comp_id',
+                    'auth_seq_id',
+                    'pdbx_PDB_ins_code'
+                ]].astype(str).apply(lambda x: '.'.join(x), axis=1)
+                res_id = label_seq_id.unique()
+                replace = dict(zip(res_id, range(len(res_id))))
+                label_seq_id.replace(replace, inplace=True)
+                tab['label_seq_id'] = label_seq_id
+
                 tab = tab[
                     [
                         'group_PDB',
@@ -173,8 +185,16 @@ class Structure:
             for col in tab.columns:
                 header += '_atom_site.{}\n'.format(col)
             file.write(header)
-            tab.to_string(file, header=False, index=False)
-            file.write('\n# \n')
+
+            colen = tab.apply(lambda x: max(x.astype(str).map(len))) + 1
+            line_format = ''
+            for col, l in colen.items():
+                line_format += '{' + f'{col}:<{l}' + '}'
+            body = '\n'.join(map(lambda x: line_format.format(**x[1]),
+                                 tab.iterrows()))
+            # tab.to_string(file, header=False, index=False)
+            file.write(body)
+            file.write('# \n')
         
         file.close()
     
@@ -543,7 +563,7 @@ def parser(path:'str'='', fmt:'str' = 'PDB', name:'str' = '') -> 'Structure':
         for pdb_col in pdb_columns:
             if pdb_col not in tab.columns:
                 tab[pdb_col] = '?'
-    
+
     tab['auth_comp_id'] = tab['auth_comp_id'].astype(str)
     tab['auth_asym_id'] = tab['auth_asym_id'].astype(str)
     
