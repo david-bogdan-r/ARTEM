@@ -194,7 +194,7 @@ class Structure:
                                  tab.iterrows()))
             # tab.to_string(file, header=False, index=False)
             file.write(body)
-            file.write('# \n')
+            file.write('\n# \n')
         
         file.close()
     
