@@ -107,7 +107,12 @@ class Structure:
                 msg = []
             
             tab['auth_atom_id'] = tab.apply(atom_id_PDBformat, axis=1)
-            
+
+            if tab['occupancy'].dtype == float:
+                tab['occupancy'] = tab['occupancy'].apply(lambda x: '{:.2f}'.format(x))
+            if tab['B_iso_or_equiv'].dtype == float:
+                tab['B_iso_or_equiv'] = tab['B_iso_or_equiv'].apply(lambda x: '{:.2f}'.format(x))
+
             text = ''.join(msg)
             for model_num, tt in tab.groupby('pdbx_PDB_model_num', sort=False):
                 text += MODEL.format(model_num)
@@ -475,6 +480,7 @@ def parser(path:'str'='', fmt:'str' = 'PDB', name:'str' = '') -> 'Structure':
                 file = requests.get(url).text.split('\n')
 
         for line in file:
+            line = line.strip()
             if line.startswith('_'):
                 raise Exception(
                     'File {} does not contain {} format data'.format(path, fmt)
@@ -592,7 +598,7 @@ def atom_id_PDBformat(atom:'pd.Series'):
 
 
 # PDB save formats
-ATOM   = '{group_PDB:<6}{id:>5} {auth_atom_id:>4}{label_alt_id:1}{auth_comp_id:>3}{auth_asym_id:>2}{auth_seq_id:>4}{pdbx_PDB_ins_code:1}   {Cartn_x:>8.3f}{Cartn_y:>8.3f}{Cartn_z:>8.3f}{occupancy:>6.2f}{B_iso_or_equiv:>6.2f}          {type_symbol:>2}{pdbx_formal_charge:>2}\n'
+ATOM   = '{group_PDB:<6}{id:>5} {auth_atom_id:>4}{label_alt_id:1}{auth_comp_id:>3}{auth_asym_id:>2}{auth_seq_id:>4}{pdbx_PDB_ins_code:1}   {Cartn_x:>8.3f}{Cartn_y:>8.3f}{Cartn_z:>8.3f}{occupancy:>6}{B_iso_or_equiv:>6}          {type_symbol:>2}{pdbx_formal_charge:>2}\n'
 TER    = 'TER   {id:>5}      {auth_comp_id:>3}{auth_asym_id:>2}{auth_seq_id:>4}                                                      \n'
 MODEL  = 'MODEL     {:>4}                                                                  \n'
 REMARK = 'REMARK 250 CHAIN RENAMING {} -> {}'
