@@ -33,7 +33,11 @@ matchrange  = 3.
 saveto  = ''
 saveres = ''
 
-threads = mp.cpu_count()
+if 'fork' in mp.get_all_start_methods():
+    mp.set_start_method('fork')
+    threads = mp.cpu_count()
+else:
+    threads = 1
 
 keep = 'last'
 
@@ -305,7 +309,6 @@ if  __name__ == '__main__':
     threads = int(kwargs.get('threads', threads))
     
     if threads != 1:
-        mp.set_start_method('fork')
         if threads <= 0:
             threads = mp.cpu_count()
         else:
