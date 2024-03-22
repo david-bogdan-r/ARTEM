@@ -31,6 +31,11 @@ _5_atomic_representation = {
     'B8N': ('P', "C1' C2' O2' C3' O3' C4' O4' C5' O5'", 'C5', 'C4', 'C2'),
     '3TD': ('P', "C1' C2' O2' C3' O3' C4' O4' C5' O5'", 'C5', 'C4', 'C2'),
     'UY1': ('P', "C1' C2' O2' C3' O3' C4' O4' C5' O5'", 'C5', 'C4', 'C2'),
+
+    'DA' : ('P', "C1' C2' C3' O3' C4' O4' C5' O5'", 'N9', 'C2', 'C6'),
+    'DG' : ('P', "C1' C2' C3' O3' C4' O4' C5' O5'", 'N9', 'C2', 'C6'),
+    'DC' : ('P', "C1' C2' C3' O3' C4' O4' C5' O5'", 'N1', 'C2', 'C4'),
+    'DT' : ('P', "C1' C2' C3' O3' C4' O4' C5' O5'", 'N1', 'C2', 'C4')
 }
 
 _3_atomic_representation = {
@@ -64,6 +69,11 @@ _3_atomic_representation = {
     'B8N': ('C5', 'C4', 'C2'),
     '3TD': ('C5', 'C4', 'C2'),
     'UY1': ('C5', 'C4', 'C2'),
+
+    'DA' : ('N9', 'C2', 'C6'),
+    'DG' : ('N9', 'C2', 'C6'),
+    'DC' : ('N1', 'C2', 'C4'),
+    'DT' : ('N1', 'C2', 'C4')
 }
 
 seed_res_repr = (
