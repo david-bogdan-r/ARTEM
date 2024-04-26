@@ -524,7 +524,7 @@ def parser(path:'str'='', fmt:'str' = 'PDB', name:'str' = '') -> 'Structure':
                 url = URL.format(name.upper(), '.cif')
                 text = requests.get(url).text
         
-        start = text.find('_atom_site.')
+        start = text.find('loop_\n_atom_site.') + len('loop_\n')
         if start == -1:
             raise Exception(
                 'File {} does not contain {} format data'.format(path, fmt)
