@@ -1,4 +1,4 @@
-ARTEM tool, ver. 0.9 (October 2022).
+ARTEM tool, ver. 2.0 (May 2024).
 
 USAGE
 
@@ -33,23 +33,33 @@ of the residue-residue matchings (SCND).
 
 OPTIONS
 
-    r=FILENAME [REQUIRED OPTION]
+    r=FILENAME/FOLDER/PDB-ENTRY [REQUIRED OPTION]
         Path to a reference structure in PDB/mmCIF format. For faster 
         performance, it's advised to specify the largest of the two structures 
         as the reference structure.
+        If a folder or a mask is specified instead, ARTEM will process 
+        all the PDB/mmCIF files (according to the rformat parameter) 
+        in that folder/mask as a reference structure one by one.
+        If a 4-character PDB entry is specified, ARTEM will download the
+        structure from RCSB PDB.
 
-    q=FILENAME [REQUIRED OPTION]
+    q=FILENAME/FOLDER/PDB-ENTRY [REQUIRED OPTION]
         Path to a query structure, the one that ARTEM superimposes to 
         the reference, in PDB/mmCIF format.
+        If a folder a mask is specified instead, ARTEM will process 
+        all the PDB/mmCIF files (according to the qformat parameter) 
+        in that folder/mask as a query structure one by one.
+        If a 4-character PDB entry is specified, ARTEM will download the
+        structure from RCSB PDB.
 
     matchrange=FLOAT [DEFAULT: matchrange=3.0]
-    	The threshold used for searching the mutually closest residues. Only 
-    	those pairs of residues that have their centers of mass at a distance 
-    	under the specified matchrange value can be added to the subset 
-    	of the mutually closest residues. The higher matchrange value 
-    	will produce more "noisy" matchings but won't miss anything. The lower 
-    	matchrange value will produce more "clean" matchings but 
-    	can miss something.
+        The threshold used for searching the mutually closest residues. Only 
+        those pairs of residues that have their centers of mass at a distance 
+        under the specified matchrange value can be added to the subset 
+        of the mutually closest residues. The higher matchrange value 
+        will produce more "noisy" matchings but won't miss anything. The lower 
+        matchrange value will produce more "clean" matchings but 
+        can miss something.
 
     rformat=KEYWORD, qformat=KEYWORD [DEFAULT: rformat=PDB,qformat=PDB] 
         The specification of the input coordinate file formats 
@@ -63,9 +73,9 @@ OPTIONS
         as the specified format.
 
     rmsdmin=FLOAT, rmsdmax=FLOAT [DEFAULT: rmsdmin=0,rmsdmax=1e10]
-    	The specification of minimum and maximum RMSD thresholds. 
-    	ARTEM will print and save only the superpositions that satisfy 
-    	the specified thresholds. 
+        The specification of minimum and maximum RMSD thresholds. 
+        ARTEM will print and save only the superpositions that satisfy 
+        the specified thresholds. 
 
     rmsdsizemin=FLOAT, rmsdsizemax=FLOAT [DEFAULT: rmsdsizemin=0,rmsdsizemax=1e10]
         The specification of minimum and maximum RMSD/SIZE ratio thresholds. 
@@ -73,9 +83,16 @@ OPTIONS
         the specified thresholds. 
 
     resrmsdmin=FLOAT, resrmsdmax=FLOAT [DEFAULT: resrmsdmin=0, resrmsdmax=1e10]
-    	The specification of minimum and maximum per-residue RMSD threshold.
-    	ARTEM will print and save only the superpositions that satisfy 
-    	the specified thresholds.
+        The specification of minimum and maximum per-residue RMSD threshold.
+        ARTEM will print and save only the superpositions that satisfy 
+        the specified thresholds.
+
+    rnosub=BOOL, qnosub=BOOL [DEFAULT: rnosub=False, qnosub=False]
+        Omit the sub-matches. If rnosub=True, ARTEM will not output the matches
+        representing reference residue subsets of any other match, i.e. only
+        the largest matches will be reported. Analogously if qnosub=True,
+        ARTEM will not report the matches that are query residue subsets of any
+        other match.
 
     rres=STRING, qres=STRING [DEFAULT: rres="#1",qres="#1"]
         The specification of the input reference (rres) and query (qres) 
@@ -84,13 +101,43 @@ OPTIONS
         See the format description at the end of the OPTIONS section.
 
     rresneg=STRING, qresneg=STRING [DEFAULT: None]
-    	The specification of the input reference (rresneg) and query (qresneg) 
-    	structures. The specified residues will be ignored and all the other 
-    	residues considered as part of the structure. If both "rres" 
-    	and "rresneg" (or "qres" and "qresneg") are specified simultaneusly, 
-    	ARTEM will ignore "rres" ("qres") and consider only "rresneg" 
-    	("qresneg").
+        The specification of the input reference (rresneg) and query (qresneg) 
+        structures. The specified residues will be ignored and all the other 
+        residues considered as part of the structure. If both "rres" 
+        and "rresneg" (or "qres" and "qresneg") are specified simultaneusly, 
+        ARTEM will ignore "rres" ("qres") and consider only "rresneg" 
+        ("qresneg").
         See the format description at the end of the OPTIONS section.
+
+    rrst=STRING, qrst=STRING [DEFAULT: None]
+        The specification of the input reference (rrst) and query (qrst) 
+        structure restraints for post-filtering of the matches. 
+        The format: 
+        "ChimeraX-like spec | restraint | ChimeraX-like spec | restraint |"
+        See the description of the ChimeraX-like format at the end 
+        of the OPTIONS section.
+        The possible restraints:
+            || - (empty restraint) report only the matches where the specified
+                residues have the matched counterparts.
+            |1.5| - report only the matches where the specified residues 
+                have the matched counterparts and their total RMSD 
+                is under 1.5 angstroms.
+            |A| - report only the matches where the specified residues matched
+                with adenosines. IUPAC nomenclature is allowed.
+            |strand| - report only the matches where the specified residues 
+                matched with a continuous strand (defined as all O3'-P pairs under 
+                2.0 angstroms).
+        Examples:
+            rrst = "/A:_10_20"  [or equiv. "/A:_10_20 ||"] 
+                Report only the matches where the reference structure residues
+                in chain A with identifiers from 10 to 20 are all among the 
+                matched residues.
+            qrst = " /A:DG_10 |DG| /B:G_2 /B:C_3 |strand| /B:G_2 /B:C_3 |1.0|" 
+                Report only the matches where the three query residues /A:DG_10,
+                /B:G_2, /B:C_3 are present among the matched residues, 
+                the /A:DG_10 is matching a DG residue in the reference structure,
+                and the /B:G_2 and /B:C_3 match a pair of consecutive residues
+                under 1.0 angstrom RMSD.
 
     rseed=STRING, qseed=STRING [DEFAULT: rseed=rres,qseed=qres]
         The specification of the reference and query residues that ARTEM can use
@@ -105,16 +152,18 @@ OPTIONS
         will save the output coordinate files in the specified format.
 
     saveres=STRING [DEFAULT: saveres=qres]
-    	The specification of the query structure residues that will be saved 
-    	in the output coordinate files.
+        The specification of the query structure residues that will be saved 
+        in the output coordinate files.
         See the format description at the end of the OPTIONS section.
 
     saveto=FOLDER [DEFAULT: None]
         Path to the output folder to save the coordinate files 
         of the superimposed query structures along with the mutually 
         closest residue subsets. If the specified folder does not exist, 
-        ARTEM will create it. If the folder is not specified, 
-        nothing will be saved.
+        ARTEM will create it. In the case of the reference structure input 
+        being a folder (r=FOLDER), ARTEM will create a sub-folder inside 
+        the saveto folder for each of the input reference structures. 
+        If the saveto folder is not specified, nothing will be saved. 
 
     sizemin=FLOAT, sizemax=FLOAT [DEFAULT: sizemin=1,sizemax=1e10]
         The specification of minimum and maximum SIZE thresholds. 
@@ -126,13 +175,13 @@ OPTIONS
         via editing the lib/nar.py text file.
 
     trim=BOOL [DEFAULT: trim=None]
-    	When specified, for each subset of mutually closest residues ARTEM will 
-    	iteratively remove residues with the worst per-residue RMSD from the 
-    	subset one by one with the following re-superpositioning based on the 
-    	remaining residues of the subset until the specified thresholds for rmsdmax,
-    	rmsdsizemax, resrmsdmax are reached or the subset size is less than sizemin.
+        When specified, for each subset of mutually closest residues ARTEM will 
+        iteratively remove residues with the worst per-residue RMSD from the 
+        subset one by one with the following re-superpositioning based on the 
+        remaining residues of the subset until the specified thresholds for rmsdmax,
+        rmsdsizemax, resrmsdmax are reached or the subset size is less than sizemin.
 
-    threads=INT [DEFAULT: threads=1]
+    threads=INT [DEFAULT: threads= CPU COUNT]
         Number of CPUs to use. ARTEM multiprocessing is available only for 
         UNIX-like systems.
 
@@ -151,26 +200,26 @@ OPTIONS
         #[INT]                    == Model number
         /[STRING]                 == Chain identifier
         :[STRING][_INT[CHAR|_INT] == Residue(s) specification:
-            
-            :STRING     == Residue type    
-            :_INT[CHAR] == Residue number [with insertion code]
-            :_INT_INT   == Range of residue numbers
-            
+
+            :STRING               == Residue type    
+            :_INT[CHAR]           == Residue number [with insertion code]
+            :_INT_INT             == Range of residue numbers
+
     Structure specification examples:
-        
+
         rres="#1/B:_-10_20 #1/A"    - Consider the entire chain A from model 1 
                                       and the range of chain B residues with 
                                       numbers from -10 to 20 from model 1 as 
                                       the reference structure.
-	qres="#"                    - Consider all the residues from all 
-	                              the models in the "q" file as 
-	                              the query structure.
-	saveres="/C:_10_20 /C:_20A" - Save the chain C residues with numbers 
-	                              from 10 to 20 and the chain C residue 
-	                              with number 20A (A is the insertion code).
-	rseed=:A                    - Use only the model 1 adenosines as the 
-	                              single-residue seeds from the reference 
-	                              structure.           
+        qres="#"                    - Consider all the residues from all 
+                                      the models in the "q" file as 
+                                      the query structure.
+        saveres="/C:_10_20 /C:_20A" - Save the chain C residues with numbers 
+                                      from 10 to 20 and the chain C residue 
+                                      with number 20A (A is the insertion code).
+        rseed=:A                    - Use only the model 1 adenosines as the 
+                                      single-residue seeds from the reference 
+                                      structure.
 
 
 USAGE EXAMPLES
@@ -215,5 +264,20 @@ USAGE EXAMPLES
     The user can observe a good superposition of all the three stacked 
     base pairs. Simultaneously, two of the three A-minor-forming 
     adenosines have a counterpart residue. 
+    
+    3) python3 artem.py r=examples/test_data q=examples/motif10.pdb sizemin=9 saveto=result
+    
+    Motif search example 1.
+    Report the matches of at least 9 residues between the query structure motif10.pdb and
+    all the pdb files in the examples/test_data folder. 
+    Save the results under the result folder.
+    
+    4) python3 artem.py r=examples/test_data q=examples/motif10.pdb sizemin=9 qrst="/R:_151_153 |R| /R:_151_153 |strand|"
+    
+    Motif search example 2.
+    Report the matches between the query structure motif10.pdb and
+    all the pdb files in the examples/test_data folder, 
+    where the query residues 151, 152, and 153 of chain R 
+    match with a continuous strand of purines.
 
 for more details see ./README.md

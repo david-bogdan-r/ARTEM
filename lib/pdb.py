@@ -471,13 +471,17 @@ def parser(path:'str'='', fmt:'str' = 'PDB', name:'str' = '') -> 'Structure':
         cur_model = 1
         items     = []
         
+        file = []
         if os.path.isfile(path):
             file = open(path, 'r').readlines()
         else:
             if len(name) == 4:
                 import requests
                 url = URL.format(name.upper(), '.pdb')
-                file = requests.get(url).text.split('\n')
+                resp = requests.get(url)
+                if resp.status_code == 200:
+                    file = resp.text.split('\n')
+
 
         for line in file:
             line = line.strip()
@@ -515,6 +519,7 @@ def parser(path:'str'='', fmt:'str' = 'PDB', name:'str' = '') -> 'Structure':
 
 
     elif fmt == 'CIF':
+        text = ''
         if os.path.isfile(path):
             with open(path, 'r') as file:
                 text = file.read()
@@ -522,10 +527,12 @@ def parser(path:'str'='', fmt:'str' = 'PDB', name:'str' = '') -> 'Structure':
             if len(name) == 4:
                 import requests
                 url = URL.format(name.upper(), '.cif')
-                text = requests.get(url).text
+                resp = requests.get(url)
+                if resp.status_code == 200:
+                    text = resp.text
         
         start = text.find('loop_\n_atom_site.') + len('loop_\n')
-        if start == -1:
+        if start == -1 + len('loop_\n'):
             raise Exception(
                 'File {} does not contain {} format data'.format(path, fmt)
             )
