@@ -132,7 +132,7 @@ The implementation with default parameters takes around one minute to run an ent
     q=FILENAME/FOLDER/PDB-ENTRY [REQUIRED OPTION]
         Path to a query structure, the one that ARTEM superimposes to 
         the reference, in PDB/mmCIF format.
-        If a folder a mask is specified instead, ARTEM will process 
+        If a folder or a mask is specified instead, ARTEM will process 
         all the PDB/mmCIF files (according to the qformat parameter) 
         in that folder/mask as a query structure one by one.
         If a 4-character PDB entry is specified, ARTEM will download the

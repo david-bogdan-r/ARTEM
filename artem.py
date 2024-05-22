@@ -633,11 +633,26 @@ def rstBaseTypes(codeseq:'list[str]', baseTypes:'str') -> 'bool':
     return all(map(lambda x:x.split('.')[2] in baseTypes, codeseq))
 
 
-def rstRMSD(X, Y, rst:'float') -> 'bool':
-    rot, tran = get_transform(X, Y)
-    Y = np.dot(Y, rot) + tran
-    return RMSD(X, Y) < rst
+def rrstRMSD(x:'dict', index:'list') -> 'bool':
 
+    X, Y = vstack([[r_scnd[i], q_scnd[v]] for i, v in x.items()])
+    rot, tran = get_transform(X, Y)
+
+    X, Y = vstack([[r_scnd[i], q_scnd[x[i]]] for i in index])
+    Y = np.dot(Y, rot) + tran
+
+    return RMSD(X, Y)
+
+
+def qrstRMSD(x:'dict', index:'list') -> 'bool':
+
+    X, Y = vstack([[r_scnd[v], q_scnd[i]] for i, v in x.items()])
+    rot, tran = get_transform(X, Y)
+
+    X, Y = vstack([[r_scnd[x[i]], q_scnd[i]] for i in index])
+    Y = np.dot(Y, rot) + tran
+
+    return RMSD(X, Y)
 
 
 def rstFilter(tab:'pd.DataFrame',
@@ -648,7 +663,10 @@ def rstFilter(tab:'pd.DataFrame',
     if not (rrst or qrst):
         return tab
 
-    q_count = q.count
+    tab = tab[tab['SIZE'] > 0]
+
+    if tab.empty:
+        return tab
 
     r2q = tab['neighbors'].apply(
         lambda h: dict([(v // q_count, v % q_count) for v in h])
@@ -680,17 +698,11 @@ def rstFilter(tab:'pd.DataFrame',
                 r2q = r2q[qCode.apply(lambda x: rstStrand(x, q.groups))]
 
             elif isinstance(rst, float):
-                r_scnd = r.scnd
-                q_scnd = q.scnd
-                mat = r2q.apply(
-                    lambda x: vstack(
-                        [[r_scnd[i], q_scnd[x[i]]] for i in index]
-                    )
-                )
                 r2q = r2q[
-                    mat.apply(
-                        lambda x: rstRMSD(*x, rst)
-                    )
+                    r2q.apply(
+                        lambda x:
+                            rrstRMSD(x, index)
+                    ) <= rst
                 ]
 
             elif rst in IUPAC:
@@ -734,17 +746,11 @@ def rstFilter(tab:'pd.DataFrame',
                 q2r = q2r[rCode.apply(lambda x: rstStrand(x, r.groups))]
 
             elif isinstance(rst, float):
-                r_scnd = r.scnd
-                q_scnd = q.scnd
-                mat = q2r.apply(
-                    lambda x: vstack(
-                        [[r_scnd[x[i]], q_scnd[i]] for i in index]
-                    )
-                )
                 q2r = q2r[
-                    mat.apply(
-                        lambda x: rstRMSD(*x, rst)
-                    )
+                    q2r.apply(
+                        lambda x:
+                            qrstRMSD(x, index)
+                    ) <= rst
                 ]
 
             elif rst in IUPAC:
