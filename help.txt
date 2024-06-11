@@ -103,10 +103,7 @@ OPTIONS
     rresneg=STRING, qresneg=STRING [DEFAULT: None]
         The specification of the input reference (rresneg) and query (qresneg) 
         structures. The specified residues will be ignored and all the other 
-        residues considered as part of the structure. If both "rres" 
-        and "rresneg" (or "qres" and "qresneg") are specified simultaneusly, 
-        ARTEM will ignore "rres" ("qres") and consider only "rresneg" 
-        ("qresneg").
+        residues considered as part of the structure.
         See the format description at the end of the OPTIONS section.
 
     rrst=STRING, qrst=STRING [DEFAULT: None]
