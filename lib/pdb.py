@@ -356,6 +356,24 @@ class Structure:
         structure.set_fmt(self.fmt)
         
         return structure
+
+    def get_res_substruct_2(self, res:'str',  resneg:'str') -> 'Structure':
+        '''
+        return res - resneg
+        '''
+        
+        tab = self.tab
+        resmask    = self.get_res_mask(res)
+        if resneg:
+            resmask ^= self.get_res_mask(resneg)
+
+        tab = tab[resmask]
+        
+        structure = Structure(self.name)
+        structure.set_tab(tab)
+        structure.set_fmt(self.fmt)
+        
+        return structure
     
     
     def _get_code_mask(self) -> 'pd.Series':

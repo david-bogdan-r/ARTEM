@@ -374,21 +374,31 @@ class Collection:
 
         struct = parser(path, fmt, name)
         struct.drop_duplicates_alt_id(keep=keep)
-        resstruct = struct.get_res_substruct(
-            (res, resneg)[neg],
-            neg
-        )
+        # resstruct = struct.get_res_substruct(
+        #     (res, resneg)[neg],
+        #     neg
+        # )
+        resstruct = struct.get_res_substruct_2(res, resneg)
 
         data, noise = describe(resstruct)
 
         if not data:
-            msg = 'No {}={} nucleotides in the {}={} for {}seed={}'.format(
-                ('{}res'.format(label), '{}resneg'.format(label))[neg],
-                (res, resneg)[neg],
+            # msg = 'No {}={} nucleotides in the {}={} for {}seed={}'.format(
+            #     ('{}res'.format(label), '{}resneg'.format(label))[neg],
+            #     (res, resneg)[neg],
+            #     label,
+            #     path,
+            #     label,
+            #     seed
+            # )
+            # raise Exception(msg)
+            msg = 'No {}res:="{}" - "{}"=:{}resneg nucleotides in the {}={}'.format(
+                label,
+                res,
+                resneg,
+                label, 
                 label,
                 path,
-                label,
-                seed
             )
             raise Exception(msg)
 
@@ -398,11 +408,22 @@ class Collection:
 
         seed_code = set(struct.get_res_code(seed))
         if not seed_code:
-            msg = 'No {}seed={} nucleotides in the {}={} for {}={}'.format(
+            # msg = 'No {}seed={} nucleotides in the {}={} for {}={}'.format(
+            #     label,
+            #     seed,
+            #     ('{}res'.format(label), 'rresneg'.format(label))[neg],
+            #     (res, resneg)[neg],
+            #     label,
+            #     path
+            # )
+            # raise Exception(msg)
+            msg = 'No {}seed={} nucleotides in the {}res:="{}" - "{}"=:{}resneg for {}={}'.format(
                 label,
                 seed,
-                ('{}res'.format(label), 'rresneg'.format(label))[neg],
-                (res, resneg)[neg],
+                label,
+                res,
+                resneg,
+                label,
                 label,
                 path
             )
