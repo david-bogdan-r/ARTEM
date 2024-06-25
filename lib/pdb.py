@@ -3,8 +3,8 @@ import os
 import pandas as pd 
 import numpy  as np
 
-pd.to_numeric.__defaults__ = ('ignore',) + pd.to_numeric.__defaults__[1:]
-pd.options.mode.chained_assignment = None
+# pd.to_numeric.__defaults__ = ('ignore',) + pd.to_numeric.__defaults__[1:]
+# pd.options.mode.chained_assignment = None
 
 formats = {'PDB', 'CIF'}
 URL = 'https://files.rcsb.org/view/{}{}'
@@ -532,8 +532,17 @@ def parser(path:'str'='', fmt:'str' = 'PDB', name:'str' = '') -> 'Structure':
             elif rec == 'MODEL ':
                 cur_model = int(line.split()[1])
 
-        tab = pd.DataFrame(items, columns=pdb_columns)
-        tab = tab.apply(pd.to_numeric).fillna('')
+        tab = pd.DataFrame(items, columns=pdb_columns).astype(
+            {
+                'id':int,
+                'Cartn_x': float,
+                'Cartn_y': float,
+                'Cartn_z': float,
+                'auth_seq_id': int,
+                'pdbx_PDB_model_num': int
+            }
+        )
+        # tab = tab.apply(pd.to_numeric).fillna('')
 
 
     elif fmt == 'CIF':
@@ -567,8 +576,17 @@ def parser(path:'str'='', fmt:'str' = 'PDB', name:'str' = '') -> 'Structure':
                 break
         
         items = map(str.split, tab[i:])
-        tab   = pd.DataFrame(items, columns=columns)
-        tab   = tab.apply(pd.to_numeric)
+        tab   = pd.DataFrame(items, columns=columns).astype(
+            {
+                'id':int,
+                'Cartn_x': float,
+                'Cartn_y': float,
+                'Cartn_z': float,
+                'auth_seq_id': int,
+                'pdbx_PDB_model_num': int
+            }
+        )
+        # tab   = tab.apply(pd.to_numeric)
         
         auth  = [
             'auth_asym_id',
