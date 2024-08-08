@@ -3,6 +3,7 @@ import itertools
 import multiprocessing as mp
 import os
 import sys
+import traceback
 from functools import partial
 
 import numpy as np
@@ -60,6 +61,7 @@ saveto     = ''
 saveres    = ''
 saveformat = ''
 
+silent = 'False'
 
 if 'fork' in mp.get_all_start_methods():
     mp.set_start_method('fork')
@@ -869,6 +871,8 @@ if  __name__ == '__main__':
     saveres     = kwargs.get('saveres', saveres)
     saveformat  = kwargs.get('saveformat', saveformat)
 
+    silent      = eval(kwargs.get('silent', qnosub).capitalize())
+
     try:
         rformat = {
             'CIF'  : 'CIF',
@@ -937,128 +941,150 @@ if  __name__ == '__main__':
 
 
     for i in rlist:
-        r:'Reference' = reference(*i)
-        r_code      = r.code
-        r_prim      = r.prim
-        r_scnd      = r.scnd
-        r_avg_tree  = r.avg_tree
-        r_eval      = r.eval
-        rstruct     = r.struct
 
-        if save_state:
-            _, file = os.path.split(r.path)
-            folder = os.path.join(saveto, file)
-        else:
-            folder = saveto
+        try:
+
+            r:'Reference' = reference(*i)
+            r_code      = r.code
+            r_prim      = r.prim
+            r_scnd      = r.scnd
+            r_avg_tree  = r.avg_tree
+            r_eval      = r.eval
+            rstruct     = r.struct
+
+            if save_state:
+                _, file = os.path.split(r.path)
+                folder = os.path.join(saveto, file)
+            else:
+                folder = saveto
+
+        except Exception as e:
+            if silent:
+                print('Exception: r={}'.format(r.path), file=sys.stderr)
+                tb = e.__traceback__
+                print(''.join(traceback.format_tb(tb)), file=sys.stderr)
+                continue
+            else:
+                raise e
 
         for j in qlist:
-            q:'Query' = query(*j)
-            if saveto:
-                q.set_save(saveformat, saveres)
-                q_tab = q.tab_1
-            q_code  = q.code
-            q_prim  = q.prim
-            q_scnd  = q.scnd
-            q_avg   = q.avg
-            q_eval  = q.eval
-            q_count = q.count
-            qstruct = q.struct
-            q_saveforamt = q.saveformat
+            try:
+                q:'Query' = query(*j)
+                if saveto:
+                    q.set_save(saveformat, saveres)
+                    q_tab = q.tab_1
+                q_code  = q.code
+                q_prim  = q.prim
+                q_scnd  = q.scnd
+                q_avg   = q.avg
+                q_eval  = q.eval
+                q_count = q.count
+                qstruct = q.struct
+                q_saveforamt = q.saveformat
 
-            result     = {}
-            indx_pairs = itertools.product(r.ind, q.ind)
+                result     = {}
+                indx_pairs = itertools.product(r.ind, q.ind)
 
-            if threads == 1:
-                for p, out in ((i, artem(*i)) for i in indx_pairs):
-                    if out:
-                        m, n = p 
-                        if out in result:
-                            result[out].append(m*q_count + n)
-                        else:
-                            result[out] = [m*q_count + n]
-            else:
-                cnt     = 0
-                cnt_max = len(r.ind) * len(q.ind)
-                pool    = mp.Pool(threads)
-                while cnt < cnt_max:
-                    inp = [next(indx_pairs)
-                            for _ in range(min(cnt_max - cnt, delta))]
-                    for p, out in zip(inp, pool.starmap(artem, inp)):
+                if threads == 1:
+                    for p, out in ((i, artem(*i)) for i in indx_pairs):
                         if out:
-                            m, n = p
+                            m, n = p 
                             if out in result:
-                                result[out].append(m*q.count + n)
+                                result[out].append(m*q_count + n)
                             else:
-                                result[out] = [m*q.count + n]
-                    cnt += delta
+                                result[out] = [m*q_count + n]
+                else:
+                    cnt     = 0
+                    cnt_max = len(r.ind) * len(q.ind)
+                    pool    = mp.Pool(threads)
+                    while cnt < cnt_max:
+                        inp = [next(indx_pairs)
+                                for _ in range(min(cnt_max - cnt, delta))]
+                        for p, out in zip(inp, pool.starmap(artem, inp)):
+                            if out:
+                                m, n = p
+                                if out in result:
+                                    result[out].append(m*q.count + n)
+                                else:
+                                    result[out] = [m*q.count + n]
+                        cnt += delta
 
-            items = result.items()
-            del result
+                items = result.items()
+                del result
 
-            tabrows = []
+                tabrows = []
 
-            if sizemin <= 0:
-                for npc in r.seed_npc:
-                    tabrows.append((tuple(), 0, None, None, None, npc, None))
-                for npc in q.seed_npc:
-                    tabrows.append((tuple(), 0, None, None, None, None, npc))
+                if sizemin <= 0:
+                    for npc in r.seed_npc:
+                        tabrows.append((tuple(), 0, None, None, None, npc, None))
+                    for npc in q.seed_npc:
+                        tabrows.append((tuple(), 0, None, None, None, None, npc))
 
-            for k, v in items:
-                size     = len(k) - 2
-                rmsd     = k[-2]
-                resrmsd  = k[-1]
-                rmsdsize = rmsd / size
+                for k, v in items:
+                    size     = len(k) - 2
+                    rmsd     = k[-2]
+                    resrmsd  = k[-1]
+                    rmsdsize = rmsd / size
 
-                prim = ','.join(
-                    [
-                        '='.join([r_code[s // q_count],
-                                  q_code[s % q_count]])
-                        for s in v
-                    ]
+                    prim = ','.join(
+                        [
+                            '='.join([r_code[s // q_count],
+                                    q_code[s % q_count]])
+                            for s in v
+                        ]
+                    )
+                    scnd = ','.join(
+                        [
+                            '='.join([r_code[s // q_count],
+                                    q_code[s % q_count]])
+                            for s in k[:-2]
+                        ]
+                    )
+                    tabrows.append((k[:-2], size, rmsd, rmsdsize,
+                                    resrmsd, prim, scnd))
+
+                tab = pd.DataFrame(tabrows,
+                                    columns=columns[:-2] if extended_columns 
+                                    else columns)
+                tab.sort_values(
+                    ['SIZE', 'RMSDSIZE'], 
+                    ascending=[True, False], 
+                    inplace=True
                 )
-                scnd = ','.join(
-                    [
-                        '='.join([r_code[s // q_count],
-                                  q_code[s % q_count]])
-                        for s in k[:-2]
-                    ]
+
+                tab = nosubFilter(tab, rnosub, qnosub, q_count)
+                tab = rstFilter(tab, rrst, qrst, r, q)
+
+                tab.index = list(range(1, len(tab) + 1))
+                tab.index.name = 'ID'
+
+                if extended_columns:
+                    tab['REF'] = r.path
+                    tab['QRY'] = q.path
+
+                tab.to_csv(
+                    sys.stdout,
+                    columns=columns[1:],
+                    sep='\t',
+                    float_format='{:0.3f}'.format,
+                    header=False
                 )
-                tabrows.append((k[:-2], size, rmsd, rmsdsize,
-                                resrmsd, prim, scnd))
 
-            tab = pd.DataFrame(tabrows,
-                                columns=columns[:-2] if extended_columns 
-                                else columns)
-            tab.sort_values(
-                ['SIZE', 'RMSDSIZE'], 
-                ascending=[True, False], 
-                inplace=True
-            )
+                if not saveto:
+                    continue
 
-            tab = nosubFilter(tab, rnosub, qnosub, q_count)
-            tab = rstFilter(tab, rrst, qrst, r, q)
+                if threads == 1:
+                    for superimpose in tab[tab['SIZE'] > 0].iloc:
+                        save_superimpose(superimpose)
+                else:
+                    pool.map(save_superimpose, tab[tab['SIZE'] > 0].iloc)
+                    pool.close()
 
-            tab.index = list(range(1, len(tab) + 1))
-            tab.index.name = 'ID'
-
-            if extended_columns:
-                tab['REF'] = r.path
-                tab['QRY'] = q.path
-
-            tab.to_csv(
-                sys.stdout,
-                columns=columns[1:],
-                sep='\t',
-                float_format='{:0.3f}'.format,
-                header=False
-            )
-
-            if not saveto:
-                continue
-
-            if threads == 1:
-                for superimpose in tab[tab['SIZE'] > 0].iloc:
-                    save_superimpose(superimpose)
-            else:
-                pool.map(save_superimpose, tab[tab['SIZE'] > 0].iloc)
-                pool.close()
+            except Exception as e:
+                if silent:
+                    print('Exception: r={}, q={}'.format(r.path, q.path), file=sys.stderr)
+                    tb = e.__traceback__
+                    print(''.join(traceback.format_tb(tb)), file=sys.stderr)
+                    continue
+                else:
+                    raise e
