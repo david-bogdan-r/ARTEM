@@ -270,6 +270,9 @@ The implementation with default parameters takes around one minute to run an ent
         Number of CPUs to use. ARTEM multiprocessing is available only for 
         UNIX-like systems.
 
+    silent=BOOL [DEFAULT: silent=False]
+        If specified, ARTEM will not raise any errors.
+
     ***********************************************************************
     ARTEM uses a ChimeraX-like format to specify the residues of interest 
     using the "res" parameters:
