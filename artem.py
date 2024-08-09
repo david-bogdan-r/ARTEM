@@ -871,7 +871,7 @@ if  __name__ == '__main__':
     saveres     = kwargs.get('saveres', saveres)
     saveformat  = kwargs.get('saveformat', saveformat)
 
-    silent      = eval(kwargs.get('silent', qnosub).capitalize())
+    silent      = eval(kwargs.get('silent', silent).capitalize())
 
     try:
         rformat = {
