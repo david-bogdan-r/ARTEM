@@ -616,6 +616,25 @@ def parser(path:'str'='', fmt:'str' = 'PDB', name:'str' = '') -> 'Structure':
     tab['auth_comp_id'] = tab['auth_comp_id'].astype(str)
     tab['auth_asym_id'] = tab['auth_asym_id'].astype(str)
     
+
+    if 'auth_atom_id' in tab.columns:
+        tab['auth_atom_id'] = tab['auth_atom_id'].str.replace('*', "'")
+        tab['auth_atom_id'] = tab['auth_atom_id'].replace(
+            to_replace={
+                'O1P': 'OP1',
+                'O2P': 'OP2'
+            }
+        )
+    if 'label_atom_id' in tab.columns:
+        tab['label_atom_id'] = tab['label_atom_id'].str.replace('*', "'")
+        tab['label_atom_id'] = tab['label_atom_id'].replace(
+            to_replace={
+                'O1P': 'OP1',
+                'O2P': 'OP2'
+            }
+        )
+
+
     struct = Structure(name)
     struct.set_tab(tab)
     struct.set_fmt(fmt)
