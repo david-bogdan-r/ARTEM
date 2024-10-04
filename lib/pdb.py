@@ -499,6 +499,12 @@ def parser(path:'str'='', fmt:'str' = 'PDB', name:'str' = '') -> 'Structure':
                 resp = requests.get(url)
                 if resp.status_code == 200:
                     file = resp.text.split('\n')
+                else:
+                    raise Exception(
+                        'Could not obtain {name} structure in {fmt} format from RCSB PDB'.format(
+                            name=name, fmt=fmt
+                        )
+                    )
 
 
         for line in file:
@@ -557,6 +563,12 @@ def parser(path:'str'='', fmt:'str' = 'PDB', name:'str' = '') -> 'Structure':
                 resp = requests.get(url)
                 if resp.status_code == 200:
                     text = resp.text
+                else:
+                    raise Exception(
+                        'Could not obtain {name} structure in {fmt} format from RCSB PDB'.format(
+                            name=name, fmt=fmt
+                        )
+                    )
         
         start = text.find('loop_\n_atom_site.') + len('loop_\n')
         if start == -1 + len('loop_\n'):
