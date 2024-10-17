@@ -1,4 +1,5 @@
 import os
+from string import ascii_letters, digits
 
 import pandas as pd 
 import numpy  as np
@@ -45,34 +46,28 @@ class Structure:
         return self.fmt
     
     
-    def _one_letter_chain_renaming(tab:'pd.DataFrame'):
+    def _two_letter_chain_renaming(tab:'pd.DataFrame'):
         '''
         When converting from CIF to PDB format, the chain labels are translated into a one-letter code
         '''
         
-        if not hasattr(Structure, 'chain_labels'):
-            from string import ascii_letters, digits
-            chain_labels = sorted(ascii_letters) + list(digits)
-            Structure.chain_labels = chain_labels
-        else:
-            chain_labels = Structure.chain_labels
-        
         cur_chain_labels = tab['auth_asym_id'].astype(str).unique()
-        allowed_labels = sorted(set(chain_labels) - set(cur_chain_labels), 
-                                key=lambda x: (x.isdigit(), x.islower(), x))
-        
-        rnm = {}
-        cnt = 0
-        for lbl in cur_chain_labels:
-            if len(lbl) > 1:
+        rnm = {c: '' for c in cur_chain_labels if len(c) > 2}
+        if rnm:
+            lbl = ascii_letters + digits
+            lbl = (x + y for x in ' ' + lbl for y in lbl)
+
+            for c in rnm.keys():
                 try:
-                    rnm[lbl] = allowed_labels[cnt]
-                except IndexError:
-                    raise IndexError('One-letter chain renaming is not possible. Number of chains exceeds the limit 62.')
-                cnt += 1
-        
-        msg = []
-        if cnt:
+                    l = next(lbl).lstrip()
+                    while l in cur_chain_labels:
+                        l = next(lbl).lstrip()
+                    rnm[c] = l
+                except:
+                    raise NameError('Unable to rename chains '\
+                                    'to a two-letter code')
+
+            msg = []
             tab = tab.copy()
             tab['auth_asym_id'].replace(rnm, inplace=True)
 
@@ -80,7 +75,7 @@ class Structure:
                 rmk = REMARK.format(k, v)
                 rmk += ' ' * (80 - len(rmk)) + '\n'
                 msg.append(rmk)
-        
+
         return tab, msg
     
     
@@ -100,7 +95,7 @@ class Structure:
         
         if fmt == 'PDB':
             if self.fmt != fmt:
-                tab, msg = Structure._one_letter_chain_renaming(tab)
+                tab, msg = Structure._two_letter_chain_renaming(tab)
                 tab = tab.replace('.', '')
                 tab.replace('?', '', inplace=True)
             else:
