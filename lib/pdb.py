@@ -54,8 +54,8 @@ class Structure:
         cur_chain_labels = tab['auth_asym_id'].astype(str).unique()
         rnm = {c: '' for c in cur_chain_labels if len(c) > 2}
         if rnm:
-            lbl = ascii_letters + digits
-            lbl = (x + y for x in ' ' + lbl for y in lbl)
+            lbl1 = ascii_letters + digits
+            lbl = (x + y for x in ' ' + lbl1 for y in lbl1)
 
             for c in rnm.keys():
                 try:
