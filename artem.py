@@ -63,6 +63,8 @@ saveformat = ''
 
 silent = 'False'
 
+m1only = 'False'
+
 if 'fork' in mp.get_all_start_methods():
     mp.set_start_method('fork')
     threads = mp.cpu_count()
@@ -278,6 +280,8 @@ def artem(m, n):
 
 
 def save_superimpose(superimpose:'pd.Series') -> 'None':
+    global m1only
+
     neighbors = superimpose['neighbors']
     neighbors = [(v // q_count, v % q_count) for v in neighbors]
     X, Y = vstack([[r_scnd[i], q_scnd[j]] for i, j in neighbors])
@@ -292,35 +296,41 @@ def save_superimpose(superimpose:'pd.Series') -> 'None':
     )
     max_models = tab_1['pdbx_PDB_model_num'].max()
     
-    rsavecode, qsavecode = zip(*neighbors)
-    
-    rsavecode = [r_code[i] for i in rsavecode]
-    rmask = rstruct._get_code_mask().isin(rsavecode)
-    tab_2 = rstruct.tab[rmask]
-    tab_2['pdbx_PDB_model_num'] = max_models + 1
-    
-    qsavecode = [q_code[i] for i in qsavecode]
-    qmask = qstruct._get_code_mask().isin(qsavecode)
-    tab_3 = qstruct.tab[qmask]
-    tab_3.loc[:, coord_cols] = np.round(
-        np.dot(tab_3[coord_cols], rot) + tran, 
-        3
-    )
-    tab_3['pdbx_PDB_model_num'] = max_models + 2
-    
-    struct = Structure('{}_{}'.format(qstruct, superimpose.name))
-    used_cols = min([tab_1.columns, tab_2.columns], key=len)
-    tab = pd.concat([tab_1[used_cols], tab_2[used_cols], tab_3[used_cols]])
-    
-    if rstruct.fmt != qstruct.fmt:
-        tab['label_alt_id'].replace('.', '', inplace=True)
-        tab['pdbx_PDB_ins_code'].replace('?', '', inplace=True)
-        tab['pdbx_formal_charge'].replace('?', '', inplace=True)
+    if not m1only:
+        rsavecode, qsavecode = zip(*neighbors)
         
-        struct.set_tab(tab)
-        struct.set_fmt('PDB')
+        rsavecode = [r_code[i] for i in rsavecode]
+        rmask = rstruct._get_code_mask().isin(rsavecode)
+        tab_2 = rstruct.tab[rmask]
+        tab_2['pdbx_PDB_model_num'] = max_models + 1
+        
+        qsavecode = [q_code[i] for i in qsavecode]
+        qmask = qstruct._get_code_mask().isin(qsavecode)
+        tab_3 = qstruct.tab[qmask]
+        tab_3.loc[:, coord_cols] = np.round(
+            np.dot(tab_3[coord_cols], rot) + tran, 
+            3
+        )
+        tab_3['pdbx_PDB_model_num'] = max_models + 2
+        
+        struct = Structure('{}_{}'.format(qstruct, superimpose.name))
+        used_cols = min([tab_1.columns, tab_2.columns], key=len)
+        tab = pd.concat([tab_1[used_cols], tab_2[used_cols], tab_3[used_cols]])
+        
+        if rstruct.fmt != qstruct.fmt:
+            tab['label_alt_id'].replace('.', '', inplace=True)
+            tab['pdbx_PDB_ins_code'].replace('?', '', inplace=True)
+            tab['pdbx_formal_charge'].replace('?', '', inplace=True)
+            
+            struct.set_tab(tab)
+            struct.set_fmt('PDB')
+        else:
+            struct.set_tab(tab)
+            struct.set_fmt(qstruct.fmt)
+
     else:
-        struct.set_tab(tab)
+        struct = Structure('{}_{}'.format(qstruct, superimpose.name))
+        struct.set_tab(tab_1)
         struct.set_fmt(qstruct.fmt)
 
     struct.saveto(folder, q_saveforamt)
@@ -872,6 +882,8 @@ if  __name__ == '__main__':
     saveformat  = kwargs.get('saveformat', saveformat)
 
     silent      = eval(kwargs.get('silent', silent).capitalize())
+
+    m1only      = eval(kwargs.get('m1only', m1only).capitalize())
 
     try:
         rformat = {

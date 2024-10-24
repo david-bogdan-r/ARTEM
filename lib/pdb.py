@@ -76,7 +76,9 @@ class Structure:
                 rmk += ' ' * (80 - len(rmk)) + '\n'
                 msg.append(rmk)
 
-        return tab, msg
+            return tab, msg
+        else:
+            return tab, []
     
     
     def saveto(self, folder:'str', fmt:'str' = None) -> 'None':
