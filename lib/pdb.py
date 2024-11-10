@@ -128,9 +128,9 @@ class Structure:
         elif fmt == 'CIF':
             if self.fmt != fmt:
                 tab = tab.copy()
-                tab['pdbx_PDB_ins_code'].replace('', '?', inplace=True)
-                tab['pdbx_formal_charge'].replace('', '?', inplace=True)
-                tab['label_alt_id'].replace('', '.', inplace=True)
+                tab['pdbx_PDB_ins_code'] = tab['pdbx_PDB_ins_code'].replace('', '?')
+                tab['pdbx_formal_charge'] = tab['pdbx_formal_charge'].replace('', '?')
+                tab['label_alt_id'] = tab['label_alt_id'].replace('', '.')
                 
                 tab['label_atom_id']   = tab['auth_atom_id']
                 tab['label_comp_id']   = tab['auth_comp_id']
@@ -139,7 +139,8 @@ class Structure:
                 
                 entity = tab['label_asym_id'].unique()
                 entity = dict(zip(entity, range(1, len(entity) + 1)))
-                tab['label_entity_id'] = tab['label_asym_id'].replace(entity)
+                with pd.option_context("future.no_silent_downcasting", True):
+                    tab['label_entity_id'] = tab['label_asym_id'].replace(entity)
                 
                 label_seq_id = tab[[
                     'pdbx_PDB_model_num',
@@ -149,8 +150,9 @@ class Structure:
                     'pdbx_PDB_ins_code'
                 ]].astype(str).apply(lambda x: '.'.join(x), axis=1)
                 res_id = label_seq_id.unique()
-                replace = dict(zip(res_id, range(len(res_id))))
-                label_seq_id.replace(replace, inplace=True)
+                replace = dict(zip(res_id, range(1, len(res_id)+1)))
+                with pd.option_context("future.no_silent_downcasting", True):
+                    label_seq_id.replace(replace, inplace=True)
                 tab['label_seq_id'] = label_seq_id
 
                 tab = tab[
