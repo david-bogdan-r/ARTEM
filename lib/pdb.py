@@ -139,8 +139,7 @@ class Structure:
                 
                 entity = tab['label_asym_id'].unique()
                 entity = dict(zip(entity, range(1, len(entity) + 1)))
-                with pd.option_context("future.no_silent_downcasting", True):
-                    tab['label_entity_id'] = tab['label_asym_id'].replace(entity)
+                tab['label_entity_id'] = [entity[x] for x in tab['label_asym_id']]
                 
                 label_seq_id = tab[[
                     'pdbx_PDB_model_num',
@@ -151,8 +150,7 @@ class Structure:
                 ]].astype(str).apply(lambda x: '.'.join(x), axis=1)
                 res_id = label_seq_id.unique()
                 replace = dict(zip(res_id, range(1, len(res_id)+1)))
-                with pd.option_context("future.no_silent_downcasting", True):
-                    label_seq_id.replace(replace, inplace=True)
+                label_seq_id.loc[:] = [replace[x] for x in label_seq_id]
                 tab['label_seq_id'] = label_seq_id
 
                 tab = tab[
