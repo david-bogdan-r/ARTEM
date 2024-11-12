@@ -627,7 +627,8 @@ def parser(path:'str'='', fmt:'str' = 'PDB', name:'str' = '') -> 'Structure':
     
 
     if 'auth_atom_id' in tab.columns:
-        tab['auth_atom_id'] = tab['auth_atom_id'].str.replace('*', "'")
+        # tab['auth_atom_id'] = tab['auth_atom_id'].str.replace('*', "'")
+        tab['auth_atom_id'] = [str(x).replace('*', "'") for x in tab['auth_atom_id']]
         tab['auth_atom_id'] = tab['auth_atom_id'].replace(
             to_replace={
                 'O1P': 'OP1',
@@ -635,7 +636,8 @@ def parser(path:'str'='', fmt:'str' = 'PDB', name:'str' = '') -> 'Structure':
             }
         )
     if 'label_atom_id' in tab.columns:
-        tab['label_atom_id'] = tab['label_atom_id'].str.replace('*', "'")
+        # tab['label_atom_id'] = tab['label_atom_id'].str.replace('*', "'")
+        tab['label_atom_id'] = [str(x).replace('*', "'") for x in tab['label_atom_id']]
         tab['label_atom_id'] = tab['label_atom_id'].replace(
             to_replace={
                 'O1P': 'OP1',
