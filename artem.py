@@ -972,7 +972,7 @@ if  __name__ == '__main__':
 
         except Exception as e:
             if silent:
-                print('Exception: r={}'.format(r.path), file=sys.stderr)
+                print('Exception: r={}'.format(i[0]), file=sys.stderr)
                 tb = e.__traceback__
                 print(''.join(traceback.format_tb(tb)), file=sys.stderr)
                 continue
@@ -1094,7 +1094,7 @@ if  __name__ == '__main__':
 
             except Exception as e:
                 if silent:
-                    print('Exception: r={}, q={}'.format(r.path, q.path), file=sys.stderr)
+                    print('Exception: r={}, q={}'.format(r.path, j[0]), file=sys.stderr)
                     tb = e.__traceback__
                     print(''.join(traceback.format_tb(tb)), file=sys.stderr)
                     continue
