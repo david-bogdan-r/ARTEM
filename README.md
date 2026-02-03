@@ -4,7 +4,7 @@
 
 ## References
 
-[E.F. Baulin, D.R. Bohdan, D. Kowalski, M. Serwatka, J. Świerczyńska, Z. Żyra, J.M. Bujnicki, (2024) ARTEM: a method for RNA tertiary motif identification with backbone permutations, and its example application to kink-turn-like motifs. bioRxiv. DOI: 10.1101/2024.05.31.596898](https://doi.org/10.1101/2024.05.31.596898)
+[E.F. Baulin, D.R. Bohdan, D. Kowalski, M. Serwatka, J. Świerczyńska, Z. Żyra, J.M. Bujnicki, (2025) ARTEM: a method for RNA and DNA tertiary motif identification with backbone permutations. Genome Biology, 26(1), 226. DOI: 10.1186/s13059-025-03696-2](https://doi.org/10.1186/s13059-025-03696-2)
 
 [D.R. Bohdan, V.V. Voronina, J.M. Bujnicki, E.F. Baulin (2023) A comprehensive survey of long-range tertiary interactions and motifs in non-coding RNA structures. Nucleic Acids Research. gkad605. DOI: 10.1093/nar/gkad605](https://doi.org/10.1093/nar/gkad605)
 
